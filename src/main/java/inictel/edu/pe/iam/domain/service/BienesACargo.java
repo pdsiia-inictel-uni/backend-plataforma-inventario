@@ -1,5 +1,7 @@
 package inictel.edu.pe.iam.domain.service;
 
+import java.util.List;
+
 /**
  * Puerto hacia {@code inventario}: lo minimo que la gestion de personas
  * necesita saber de los bienes (RNF-39).
@@ -19,6 +21,17 @@ public interface BienesACargo {
     long contarDe(Long usuarioId);
 
     /**
+     * Los bienes en servicio a nombre de esa persona, nombrados uno a uno.
+     *
+     * <p>La cuenta basta para <b>decidir</b> si la baja procede; esta lista es
+     * para <b>explicarlo</b>. Quien va a dar de baja a un Operador necesita
+     * saber que equipos son antes de ir a buscarlos al inventario, y decirle
+     * solo "tiene tres" lo obliga a averiguar cuales por su cuenta
+     * (RNF-23).</p>
+     */
+    List<BienACargo> listarDe(Long usuarioId);
+
+    /**
      * Suelta los bienes que esa persona tenia a su nombre, que pasan a cargo
      * del Responsable de la Coordinacion.
      *
@@ -28,4 +41,15 @@ public interface BienesACargo {
      * los lleva.</p>
      */
     void devolverAlResponsableLosDe(Long usuarioId);
+
+    /**
+     * Lo justo para reconocer un equipo en una frase: como se llama, con que
+     * codigo esta inventariado y donde esta.
+     *
+     * <p>Es un tipo propio de {@code iam} y no el DTO del inventario: el
+     * contexto de personas no debe quedar atado a la ficha completa de un bien
+     * para poder nombrarlo (RNF-39).</p>
+     */
+    record BienACargo(Long id, String nombre, String codigoInventario, String laboratorio) {
+    }
 }

@@ -13,6 +13,7 @@ import inictel.edu.pe.iam.application.comando.ActualizarUsuarioComando;
 import inictel.edu.pe.iam.application.comando.AsignarPuestoComando;
 import inictel.edu.pe.iam.application.comando.RegistrarUsuarioComando;
 import inictel.edu.pe.iam.application.dto.AsignacionRealizadaDto;
+import inictel.edu.pe.iam.application.dto.EquiposACargoDto;
 import inictel.edu.pe.iam.application.dto.PasswordTemporalDto;
 import inictel.edu.pe.iam.application.dto.UsuarioDto;
 import inictel.edu.pe.iam.domain.model.CorreoInstitucional;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Casos de uso de administracion de personas (RF-16 .. RF-30).
@@ -58,6 +60,9 @@ import java.util.Optional;
  */
 @Service
 public class GestionUsuariosServicio {
+
+    /** RN-38, RNF-29: cuantos equipos se citan por su nombre en el aviso de baja. */
+    private static final int MAXIMO_EQUIPOS_CITADOS = 3;
 
     private final UsuarioRepositorio usuarios;
     private final CifradorPassword cifrador;
@@ -108,6 +113,36 @@ public class GestionUsuariosServicio {
         Usuario usuario = exigirUsuario(id);
         exigirVisibilidad(usuario);
         return componer(usuario);
+    }
+
+    /**
+     * RN-38: los equipos que impiden dar de baja a esa persona.
+     *
+     * <p>Es la misma comprobacion que hace la baja, pero <b>antes</b> y sin
+     * cambiar nada: la ficha la consulta al abrirse para poder desactivar el
+     * boton y decir por que, en lugar de dejar que el usuario lo pulse y
+     * reciba un error que ya se sabia (RNF-23, RNF-26).</p>
+     *
+     * <p>Va por la misma puerta que la baja —{@code exigirPermisoDeGestion}—
+     * porque dice lo mismo sobre la misma persona: el Responsable la ve de sus
+     * Operadores y el Administrador de cualquiera.</p>
+     */
+    @Transactional(readOnly = true)
+    public EquiposACargoDto equiposACargoDe(Long id) {
+        Usuario usuario = exigirUsuario(id);
+        exigirPermisoDeGestion(usuario);
+
+        List<EquiposACargoDto.EquipoACargoDto> equipos = bienes.listarDe(usuario.getId()).stream()
+                .map(bien -> new EquiposACargoDto.EquipoACargoDto(
+                        bien.id(), bien.nombre(), bien.codigoInventario(), bien.laboratorio()))
+                .toList();
+
+        return new EquiposACargoDto(
+                usuario.getId(),
+                usuario.nombreCompleto(),
+                equipos.size(),
+                equipos.isEmpty(),
+                equipos);
     }
 
     // ------------------------------------------------------------------
@@ -313,13 +348,13 @@ public class GestionUsuariosServicio {
     /**
      * Lleva la cuenta al estado indicado (RF-22b).
      *
-     * <p>Son tres, y la diferencia entre dos de ellos es la que la v3.7 vino a
-     * poner: la <b>suspension</b> es temporal —vacaciones, un permiso— y
-     * conserva el puesto, porque la persona vuelve a el; la <b>baja</b> es la
-     * salida de la institucion y libera el puesto, porque quien se fue no
-     * responde por un inventario (RN-34). Antes las dos cosas compartian un
-     * unico interruptor y no habia manera de saber a cual de los dos se
-     * esperaba de vuelta.</p>
+     * <p>Son dos desde la v3.12: la <b>baja</b>, que es la salida de la
+     * institucion y libera el puesto porque quien se fue no responde por un
+     * inventario (RN-34), y la <b>reincorporacion</b> de quien vuelve, que le
+     * devuelve la cuenta pero no el puesto. La suspension temporal se retiro:
+     * una ausencia de dias no es una decision sobre el acceso al sistema, y
+     * tener dos formas distintas de no entrar obligaba a cada pantalla a
+     * explicar cual era cual.</p>
      *
      * <p>El Administrador lo hace sobre cualquiera —responsables, operadores y
      * otros administradores— con dos limites: no sobre si mismo, y nunca
@@ -334,38 +369,21 @@ public class GestionUsuariosServicio {
         Usuario usuario = exigirUsuario(id);
         exigirPermisoDeGestion(usuario);
 
-        if (destino != EstadoCuenta.ACTIVA) {
-            exigirQueNoSeaElPropioUsuario(usuario, destino == EstadoCuenta.BAJA
-                    ? "No puede darse de baja a usted mismo. Pidaselo a otro administrador."
-                    : "No puede suspender su propia cuenta.");
-            // RF-25: el sistema no se queda sin quien lo administre, ni por una
-            // suspension de un mes ni por una baja definitiva.
+        if (destino == EstadoCuenta.BAJA) {
+            exigirQueNoSeaElPropioUsuario(usuario,
+                    "No puede darse de baja a usted mismo. Pidaselo a otro administrador.");
+            // RF-25: el sistema no se queda sin quien lo administre.
             if (usuario.esAdmin()) {
                 exigirQueQuedeUnAdministrador(usuario);
             }
-        }
-
-        // RN-38: la baja libera el puesto, y con el la Coordinacion. Quien
-        // tiene equipos a su nombre no puede irse dejandolos sin nadie que
-        // responda por ellos. La suspension no lo exige: conserva el puesto y
-        // la persona vuelve a el, asi que sus equipos siguen siendo suyos.
-        if (destino == EstadoCuenta.BAJA) {
+            // RN-38: la baja libera el puesto, y con el la Coordinacion. Quien
+            // tiene equipos a su nombre no puede irse dejandolos sin nadie que
+            // responda por ellos.
             exigirQueNoTengaBienesACargo(usuario, "darle de baja");
-        }
 
-        switch (destino) {
-            case SUSPENDIDA -> usuario.suspender();
-            case BAJA -> usuario.darDeBaja();
-            // Reactivar y reincorporar son la misma peticion —"que vuelva a
-            // entrar"— y el agregado sabe cual de las dos le toca segun de
-            // donde venga: la reincorporacion, ademas, no le devuelve el puesto.
-            case ACTIVA -> {
-                if (usuario.estaDeBaja()) {
-                    usuario.reincorporar();
-                } else {
-                    usuario.reactivar();
-                }
-            }
+            usuario.darDeBaja();
+        } else {
+            usuario.reincorporar();
         }
 
         return componer(usuarios.guardar(usuario));
@@ -784,16 +802,39 @@ public class GestionUsuariosServicio {
      * (seccion 5). Aqui se comprueba antes para poder explicarlo.</p>
      */
     private void exigirQueNoTengaBienesACargo(Usuario usuario, String queSeIbaAHacer) {
-        long cuantos = bienes.contarDe(usuario.getId());
-        if (cuantos == 0) {
+        List<BienesACargo.BienACargo> aCargo = bienes.listarDe(usuario.getId());
+        if (aCargo.isEmpty()) {
             return;
         }
+        int cuantos = aCargo.size();
         throw new ReglaNegocioException(
                 "'" + usuario.nombreCompleto() + "' tiene " + cuantos
                         + (cuantos == 1 ? " equipo a su cargo" : " equipos a su cargo")
-                        + ", asi que no se puede " + queSeIbaAHacer + " todavia. "
+                        + ", asi que no se puede " + queSeIbaAHacer + " todavia: "
+                        + nombrar(aCargo) + ". "
                         + "Desde la ficha de cada equipo, el responsable de la coordinacion debe "
-                        + "entregarselos a otro operador o quedarselos el.");
+                        + "entregarselos a otro operador de la misma coordinacion o quedarselos el. "
+                        + "Cuando no le quede ninguno, la baja se podra completar.");
+    }
+
+    /**
+     * Nombra los equipos que retienen a la persona, hasta un limite.
+     *
+     * <p>Se citan los tres primeros y se cuenta el resto: la lista entera de un
+     * Operador con veinte equipos convertiria el aviso en un listado ilegible,
+     * y para eso esta {@code GET /api/usuarios/{id}/equipos-a-cargo}, que los
+     * devuelve todos (RNF-29).</p>
+     */
+    private static String nombrar(List<BienesACargo.BienACargo> aCargo) {
+        String citados = aCargo.stream()
+                .limit(MAXIMO_EQUIPOS_CITADOS)
+                .map(bien -> bien.nombre() + " (" + bien.codigoInventario() + ")")
+                .collect(Collectors.joining(", "));
+        int restantes = aCargo.size() - Math.min(aCargo.size(), MAXIMO_EQUIPOS_CITADOS);
+        if (restantes == 0) {
+            return citados;
+        }
+        return citados + " y " + restantes + (restantes == 1 ? " equipo mas" : " equipos mas");
     }
 
     /** RF-26b: hay operaciones que solo toma el Administrador. */

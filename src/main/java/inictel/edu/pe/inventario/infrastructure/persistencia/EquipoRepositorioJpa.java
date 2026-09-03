@@ -109,6 +109,16 @@ public class EquipoRepositorioJpa implements EquipoRepositorio {
     }
 
     @Override
+    public List<ConteoACargo> contarPorResponsableDeEquipo(Long coordinacionId) {
+        if (coordinacionId == null) {
+            return List.of();
+        }
+        return jpa.contarPorResponsableDeEquipo(coordinacionId).stream()
+                .map(fila -> new ConteoACargo((Long) fila[0], ((Number) fila[1]).longValue()))
+                .toList();
+    }
+
+    @Override
     public long contarActivosEnCoordinacion(Long coordinacionId) {
         return coordinacionId == null ? 0 : jpa.countByCoordinacionIdAndActivoTrue(coordinacionId);
     }
@@ -149,6 +159,7 @@ public class EquipoRepositorioJpa implements EquipoRepositorio {
                 EquipoSpecifications.textoLibre(filtro.texto()),
                 EquipoSpecifications.deCategoria(filtro.categoriaId()),
                 EquipoSpecifications.enLaboratorio(filtro.laboratorioId()),
+                EquipoSpecifications.aCargoDe(filtro.responsableEquipoId(), filtro.sinResponsableEquipo()),
                 EquipoSpecifications.conCondicion(filtro.condicion(), filtro.todasLasCondiciones()));
     }
 }

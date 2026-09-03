@@ -5,6 +5,7 @@ import inictel.edu.pe.compartido.presentation.PaginaResponse;
 import inictel.edu.pe.inventario.application.dto.EquipoDto;
 import inictel.edu.pe.inventario.application.dto.EquipoResumenDto;
 import inictel.edu.pe.inventario.application.dto.MovimientoDto;
+import inictel.edu.pe.inventario.application.dto.ResponsableEquipoDto;
 import inictel.edu.pe.inventario.application.service.GestionInventarioServicio;
 import inictel.edu.pe.inventario.domain.model.CondicionEquipo;
 import inictel.edu.pe.inventario.domain.repository.FiltroEquipos;
@@ -60,9 +61,19 @@ public class EquipoController {
     /**
      * RF-47: por defecto solo los bienes operativos. {@code todas=true} o una
      * {@code condicion} explicita cambian la vista.
+     *
+     * @param responsableEquipoId RF-84: deja solo los bienes que esa persona
+     *                            tiene a su nombre. Es el listado por
+     *                            responsable de equipo: el Operador consulta
+     *                            los suyos enviando su propio identificador y
+     *                            el Responsable revisa los de cada uno de los
+     *                            suyos
+     * @param sinResponsable      RF-84: deja solo los que no estan asignados a
+     *                            ningun Operador, que son los que lleva el
+     *                            propio Responsable de la Coordinacion (RN-37)
      */
     @GetMapping
-    @Operation(summary = "Lista los bienes; por defecto solo los operativos (RF-47)")
+    @Operation(summary = "Lista los bienes; por defecto solo los operativos (RF-47, RF-84)")
     public PaginaResponse<EquipoResumenDto> listar(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long coordinacionId,
@@ -70,16 +81,39 @@ public class EquipoController {
             @RequestParam(required = false) Long laboratorioId,
             @RequestParam(required = false) CondicionEquipo condicion,
             @RequestParam(defaultValue = "false") boolean todas,
+            @RequestParam(required = false) Long responsableEquipoId,
+            @RequestParam(defaultValue = "false") boolean sinResponsable,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "10") int tamano,
             @RequestParam(defaultValue = "nombre") String ordenarPor,
             @RequestParam(defaultValue = "false") boolean descendente) {
 
         FiltroEquipos filtro = new FiltroEquipos(
-                coordinacionId, q, categoriaId, laboratorioId, condicion, todas);
+                coordinacionId, q, categoriaId, laboratorioId, condicion, todas,
+                responsableEquipoId, sinResponsable);
 
         return PaginaResponse.de(inventario.buscar(
                 filtro, CriterioPagina.de(pagina, tamano, ordenarPor, descendente)));
+    }
+
+    /**
+     * RF-84: quien lleva equipos en la coordinacion y cuantos lleva cada uno.
+     *
+     * <p>Es el indice del listado por responsable de equipo: da las opciones
+     * del desplegable con su recuento, de modo que quien lo abre ve el reparto
+     * antes de elegir y no acaba en una lista vacia (RNF-23). La primera fila
+     * es la del Responsable de la coordinacion, cuyos bienes son los que no
+     * tienen asignacion (RN-37).</p>
+     *
+     * <p>Lo consultan los tres roles: el Operador para encontrarse a si mismo,
+     * el Responsable para repartir y el Administrador para revisar una
+     * coordinacion, que debe indicar (RF-49).</p>
+     */
+    @GetMapping("/responsables")
+    @Operation(summary = "Reparto del inventario: quien tiene equipos a su cargo y cuantos (RF-84)")
+    public List<ResponsableEquipoDto> responsablesDeEquipo(
+            @RequestParam(required = false) Long coordinacionId) {
+        return inventario.responsablesDeEquipo(coordinacionId);
     }
 
     @GetMapping("/{id}")

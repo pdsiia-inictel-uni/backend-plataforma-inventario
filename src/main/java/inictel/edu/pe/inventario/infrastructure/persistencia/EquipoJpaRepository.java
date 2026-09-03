@@ -53,6 +53,23 @@ public interface EquipoJpaRepository
             """)
     List<Object[]> contarPorCondicion(@Param("coordinacionId") Long coordinacionId);
 
+    /**
+     * RF-84: cuantos bienes en servicio lleva cada persona de la Coordinacion.
+     *
+     * <p>La fila con identificador nulo son los que no estan asignados a ningun
+     * Operador, es decir, los que lleva el Responsable de la Coordinacion
+     * (RN-37). Se agrupa en la base y no contando bien a bien porque el listado
+     * por responsable pinta el desplegable entero de una vez (RNF-12).</p>
+     */
+    @Query("""
+            SELECT e.responsableEquipoId, COUNT(e)
+            FROM EquipoJpaEntity e
+            WHERE e.activo = TRUE
+              AND e.coordinacionId = :coordinacionId
+            GROUP BY e.responsableEquipoId
+            """)
+    List<Object[]> contarPorResponsableDeEquipo(@Param("coordinacionId") Long coordinacionId);
+
     @Query("""
             SELECT e.categoria.nombre, COUNT(e)
             FROM EquipoJpaEntity e

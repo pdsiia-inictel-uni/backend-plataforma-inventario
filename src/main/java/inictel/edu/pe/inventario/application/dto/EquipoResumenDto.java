@@ -8,10 +8,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Fila del listado de inventario (RF-47, RF-50).
+ * Fila del listado de inventario (RF-47, RF-50, RF-84).
  *
  * <p>Solo lo que la tabla muestra: mantener la proyeccion estrecha es lo que
  * permite paginar 50,000 bienes sin degradar la respuesta (RNF-12).</p>
+ *
+ * @param responsableEquipoId Operador a cargo del bien, o {@code null} si lo
+ *                            lleva el Responsable de la Coordinacion (RF-83)
+ * @param responsableEquipo   nombre de quien responde por el bien hoy. Nunca
+ *                            queda vacio: si no hay Operador asignado es el
+ *                            Responsable vigente, que es lo que significa no
+ *                            tener asignacion (RN-37)
  */
 public record EquipoResumenDto(
         Long id,
@@ -28,9 +35,11 @@ public record EquipoResumenDto(
         LocalDate fechaAdquisicion,
         BigDecimal costo,
         boolean revisionPendiente,
+        Long responsableEquipoId,
+        String responsableEquipo,
         LocalDateTime fechaRegistro) {
 
-    public static EquipoResumenDto de(Equipo e, String laboratorio) {
+    public static EquipoResumenDto de(Equipo e, String laboratorio, String responsableEquipo) {
         return new EquipoResumenDto(
                 e.getId(),
                 e.getNombre(),
@@ -46,6 +55,8 @@ public record EquipoResumenDto(
                 e.getFechaAdquisicion(),
                 e.getCosto(),
                 e.isRevisionPendiente(),
+                e.getResponsableEquipoId(),
+                responsableEquipo,
                 e.getFechaRegistro());
     }
 }

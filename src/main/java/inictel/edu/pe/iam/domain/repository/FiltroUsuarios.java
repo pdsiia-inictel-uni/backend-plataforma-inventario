@@ -13,7 +13,7 @@ import inictel.edu.pe.iam.domain.model.EstadoCuenta;
  *                       en curso cuando quien consulta no es Administrador (RN-23)
  * @param sinAsignar     TRUE devuelve solo a las personas registradas que aun no
  *                       tienen puesto; FALSE, solo a las que ya lo tienen (RF-28e)
- * @param estado         situacion de la cuenta: activa, suspendida o de baja
+ * @param estado         situacion de la cuenta: activa o de baja (RF-22b)
  *                       (RF-22b). Desde la v3.7 son tres y no dos, porque
  *                       irse de vacaciones y dejar la institucion no son lo
  *                       mismo y la lista tiene que poder distinguirlos

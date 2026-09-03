@@ -4,6 +4,7 @@ import inictel.edu.pe.compartido.domain.CriterioPagina;
 import inictel.edu.pe.compartido.domain.seguridad.Rol;
 import inictel.edu.pe.compartido.presentation.PaginaResponse;
 import inictel.edu.pe.iam.application.dto.AsignacionRealizadaDto;
+import inictel.edu.pe.iam.application.dto.EquiposACargoDto;
 import inictel.edu.pe.iam.application.dto.PasswordTemporalDto;
 import inictel.edu.pe.iam.application.dto.UsuarioDto;
 import inictel.edu.pe.iam.application.service.GestionUsuariosServicio;
@@ -112,6 +113,21 @@ public class UsuarioController {
         return usuarios.obtener(id);
     }
 
+    /**
+     * RN-38: los equipos que retienen a esta persona en su puesto.
+     *
+     * <p>Lo consulta la ficha para <b>advertirlo antes</b>: mientras la lista
+     * no este vacia, la baja se rechaza, y la pantalla puede decir cuantos son
+     * y cuales en vez de dejar que el usuario lo descubra al pulsar el boton
+     * (RNF-23, RNF-26). Es una consulta: no cambia nada.</p>
+     */
+    @GetMapping("/{id}/equipos-a-cargo")
+    @PreAuthorize("hasAnyRole('ADMIN','RESPONSABLE')")
+    @Operation(summary = "Equipos a cargo de una persona; mientras tenga alguno no se puede dar de baja (RN-38)")
+    public EquiposACargoDto equiposACargo(@PathVariable Long id) {
+        return usuarios.equiposACargoDe(id);
+    }
+
     // ------------------------------------------------------------------
     // Escritura
     // ------------------------------------------------------------------
@@ -191,18 +207,22 @@ public class UsuarioController {
     }
 
     /**
-     * RF-22b: lleva la cuenta a uno de sus tres estados. Nunca la elimina
-     * (RN-09).
+     * RF-22b: da de baja la cuenta o reincorpora a quien lo estaba. Nunca la
+     * elimina (RN-09).
      *
-     * <p>La <b>suspension</b> es temporal y conserva el puesto; la <b>baja</b>
-     * es la salida de la institucion y lo libera (RN-34). El Administrador lo
-     * hace sobre cualquiera salvo sobre si mismo, y nunca sobre el ultimo
-     * Administrador activo (RF-25); el Responsable, solo sobre los Operadores
-     * de su Coordinacion (RF-29).</p>
+     * <p>La <b>baja</b> es la salida de la institucion y libera el puesto
+     * (RN-34); la vuelta a ACTIVA es la reincorporacion, que devuelve la cuenta
+     * pero no el puesto. El Administrador lo hace sobre cualquiera salvo sobre
+     * si mismo, y nunca sobre el ultimo Administrador activo (RF-25); el
+     * Responsable, solo sobre los Operadores de su Coordinacion (RF-29).</p>
+     *
+     * <p><b>RN-38:</b> la baja se rechaza mientras la persona tenga equipos a
+     * su cargo. {@code GET /{id}/equipos-a-cargo} dice cuales son, para que la
+     * pantalla lo advierta antes de intentarlo (RNF-23).</p>
      */
     @PatchMapping("/{id}/estado")
     @PreAuthorize("hasAnyRole('ADMIN','RESPONSABLE')")
-    @Operation(summary = "Activa, suspende o da de baja una cuenta. Nunca la elimina (RF-22b)")
+    @Operation(summary = "Da de baja una cuenta o reincorpora a quien lo estaba. Nunca la elimina (RF-22b)")
     public UsuarioDto cambiarEstado(@PathVariable Long id,
                                     @Valid @RequestBody CambioEstadoCuentaRequest peticion) {
         return usuarios.cambiarEstado(id, peticion.estado());

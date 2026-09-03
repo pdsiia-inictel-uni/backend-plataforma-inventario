@@ -49,6 +49,25 @@ final class EquipoSpecifications {
     }
 
     /**
+     * RF-84: los bienes a nombre de una persona, o los que no tienen asignacion.
+     *
+     * <p>Un bien sin {@code responsableEquipoId} no es un bien del que nadie
+     * responda: es uno que lleva el propio Responsable de la Coordinacion, que
+     * es justamente lo que significa no estar asignado a un Operador (RN-37).
+     * Por eso las dos preguntas —"los de fulano" y "los del responsable"— caen
+     * en el mismo sitio y se resuelven aqui.</p>
+     */
+    static Specification<EquipoJpaEntity> aCargoDe(Long responsableEquipoId, boolean sinAsignar) {
+        if (responsableEquipoId != null) {
+            return (root, query, cb) -> cb.equal(root.get("responsableEquipoId"), responsableEquipoId);
+        }
+        if (sinAsignar) {
+            return (root, query, cb) -> cb.isNull(root.get("responsableEquipoId"));
+        }
+        return null;
+    }
+
+    /**
      * RF-47: el filtro de condicion del listado.
      *
      * <p>Sin condicion explicita y sin "todas", la vista muestra unicamente los

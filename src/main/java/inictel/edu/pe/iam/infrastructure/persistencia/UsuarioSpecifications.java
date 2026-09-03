@@ -62,7 +62,7 @@ final class UsuarioSpecifications {
                 : cb.isNotNull(root.get("rol"));
     }
 
-    /** RF-22b: activa, suspendida o de baja. */
+    /** RF-22b: activa o de baja. */
     static Specification<UsuarioJpaEntity> conEstado(EstadoCuenta estado) {
         if (estado == null) {
             return null;

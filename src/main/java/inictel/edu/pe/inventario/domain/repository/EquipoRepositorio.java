@@ -47,6 +47,26 @@ public interface EquipoRepositorio {
     /** Los bienes en servicio a nombre de esa persona, para reasignarlos. */
     List<Equipo> listarACargoDe(Long usuarioId);
 
+    /**
+     * RF-84: cuantos bienes en servicio lleva cada persona de una Coordinacion.
+     *
+     * <p>Es el reparto del inventario visto de golpe: quien tiene que, y
+     * cuanto. Lo consume el listado por responsable de equipo para ofrecer las
+     * opciones con su recuento, en lugar de dejar al usuario elegir un nombre
+     * a ciegas y descubrir despues que no lleva ninguno (RNF-23).</p>
+     */
+    List<ConteoACargo> contarPorResponsableDeEquipo(Long coordinacionId);
+
+    /**
+     * Bienes a nombre de una persona.
+     *
+     * @param responsableEquipoId {@code null} para los que no estan asignados a
+     *                            ningun Operador, que son los que lleva el
+     *                            Responsable de la Coordinacion (RN-37)
+     */
+    record ConteoACargo(Long responsableEquipoId, long cantidad) {
+    }
+
     // ------------------------------------------------------------------
     // Consultas de apoyo a organizacion (RF-13, RF-14, RF-15)
     // ------------------------------------------------------------------

@@ -46,10 +46,17 @@ public class ExportacionController {
             @RequestParam(required = false) Long categoriaId,
             @RequestParam(required = false) Long laboratorioId,
             @RequestParam(required = false) CondicionEquipo condicion,
-            @RequestParam(defaultValue = "true") boolean todas) {
+            @RequestParam(defaultValue = "true") boolean todas,
+            @RequestParam(required = false) Long responsableEquipoId,
+            @RequestParam(defaultValue = "false") boolean sinResponsable) {
 
+        // RF-84: el reporte sale con el mismo recorte que la pantalla. Exportar
+        // el inventario entero cuando lo que se esta mirando son los equipos de
+        // un operador convierte la descarga en otro documento distinto del que
+        // se pidio.
         FiltroEquipos filtro = new FiltroEquipos(
-                coordinacionId, q, categoriaId, laboratorioId, condicion, todas);
+                coordinacionId, q, categoriaId, laboratorioId, condicion, todas,
+                responsableEquipoId, sinResponsable);
 
         ArchivoExportadoDto archivo = exportacion.exportar(FormatoExportacion.desde(formato), filtro);
 

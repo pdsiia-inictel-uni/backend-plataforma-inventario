@@ -230,7 +230,7 @@ class UsuarioTest {
     @DisplayName("RF-28d: una cuenta que no puede entrar no recibe puesto")
     void inactivoNoRecibePuesto() {
         Usuario usuario = personaRegistrada();
-        usuario.suspender();
+        usuario.darDeBaja();
 
         assertThrows(ReglaNegocioException.class, () -> usuario.asignarA(9L, Rol.RESPONSABLE));
     }
@@ -269,26 +269,12 @@ class UsuarioTest {
         assertThrows(ReglaNegocioException.class, () -> usuario.retirarDe(8L));
     }
 
-    @Test
-    @DisplayName("RF-22b: la suspension es temporal y conserva rol y coordinacion")
-    void desactivarYReactivarConservaTodo() {
-        Usuario usuario = operadorDe(7L);
-        usuario.suspender();
-        assertFalse(usuario.estaActiva());
-        assertEquals(Set.of(7L), usuario.getCoordinaciones(), "de vacaciones no se pierde el puesto");
-
-        usuario.reactivar();
-        assertTrue(usuario.estaActiva());
-        assertTrue(usuario.esOperador());
-        assertEquals(Set.of(7L), usuario.getCoordinaciones());
-    }
-
     // ------------------------------------------------------------------
-    // RF-22b, RN-34: la baja es dejar la institucion; la suspension, no
+    // RF-22b, RN-34: la baja es dejar la institucion
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("RN-34: la baja libera el puesto; irse de la institucion no es irse de vacaciones")
+    @DisplayName("RN-34: la baja libera el puesto: quien se fue no responde por un inventario")
     void laBajaLiberaElPuesto() {
         Usuario usuario = operadorDe(7L);
 
@@ -313,26 +299,22 @@ class UsuarioTest {
     }
 
     @Test
-    @DisplayName("RF-22b: suspender y dar de baja no se pisan")
+    @DisplayName("RF-22b: baja y reincorporacion no se pisan")
     void lasTransicionesImposiblesSeRechazan() {
         Usuario usuario = personaRegistrada();
         assertThrows(ReglaNegocioException.class, usuario::reincorporar);
 
         usuario.darDeBaja();
-        assertThrows(ReglaNegocioException.class, usuario::suspender);
-        assertThrows(ReglaNegocioException.class, usuario::reactivar);
         assertThrows(ReglaNegocioException.class, usuario::darDeBaja);
     }
 
     @Test
-    @DisplayName("RF-28d: la cuenta suspendida o de baja no recibe puesto")
+    @DisplayName("RF-28d: la cuenta de baja no recibe puesto de ninguna clase")
     void sinCuentaActivaNoHayPuesto() {
-        Usuario suspendida = personaRegistrada();
-        suspendida.suspender();
-        assertThrows(ReglaNegocioException.class, () -> suspendida.asignarA(7L, Rol.OPERADOR));
-
         Usuario deBaja = personaRegistrada();
         deBaja.darDeBaja();
+
+        assertThrows(ReglaNegocioException.class, () -> deBaja.asignarA(7L, Rol.OPERADOR));
         assertThrows(ReglaNegocioException.class, () -> deBaja.asumirResponsabilidadDe(7L));
     }
 

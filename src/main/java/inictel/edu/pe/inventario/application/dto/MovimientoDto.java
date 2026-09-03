@@ -9,9 +9,18 @@ import java.time.LocalDateTime;
 /**
  * Un hecho de la linea de tiempo del bien, listo para leerse (RF-56).
  *
- * <p>{@code resumen} trae la frase ya redactada —"Prestado por Ana Diaz
- * (Operador)"— para que la vista no tenga que componerla y el texto sea el
- * mismo en la pantalla, en la exportacion y en cualquier otro consumidor.</p>
+ * <p>{@code autoria} trae la frase ya redactada para que la vista no tenga que
+ * componerla y el texto sea el mismo en la pantalla, en la exportacion y en
+ * cualquier otro consumidor.</p>
+ *
+ * @param autoria quien protagoniza el hecho, con su rol. En el <b>alta</b>
+ *                lleva el rotulo <i>"Registrado por:"</i>, porque desde la
+ *                v3.12 la ficha del bien ya no muestra quien lo registro y el
+ *                historial es donde se consulta: sin el rotulo, el nombre
+ *                queda suelto detras de la fecha y no dice de que responde
+ *                esa persona (RF-56, RNF-29). Los demas hechos ya llevan su
+ *                verbo en el titulo —"Prestado", "Dado de baja"— y no
+ *                necesitan repetirlo
  */
 public record MovimientoDto(
         Long id,
@@ -23,15 +32,16 @@ public record MovimientoDto(
         String usuario,
         Rol rolUsuario,
         String rolEtiqueta,
-        String resumen,
+        String autoria,
         LocalDateTime fechaHora) {
 
+    /** RNF-47: el historial nombra a quien ya no esta, y a quien no consta. */
+    private static final String AUTOR_DESCONOCIDO = "Usuario no disponible";
+
     public static MovimientoDto de(MovimientoEquipo m) {
-        String autor = m.usuarioNombre() == null ? "Usuario no disponible" : m.usuarioNombre();
+        String autor = m.usuarioNombre() == null ? AUTOR_DESCONOCIDO : m.usuarioNombre();
         String rol = m.rolUsuario() == null ? null : m.rolUsuario().getEtiqueta();
-        String resumen = rol == null
-                ? m.tipo().getEtiqueta() + " por " + autor
-                : m.tipo().getEtiqueta() + " por " + autor + " (" + rol + ")";
+        String conRol = rol == null ? autor : autor + " (" + rol + ")";
 
         return new MovimientoDto(
                 m.id(),
@@ -43,7 +53,7 @@ public record MovimientoDto(
                 autor,
                 m.rolUsuario(),
                 rol,
-                resumen,
+                m.tipo() == TipoMovimiento.ALTA ? "Registrado por: " + conRol : conRol,
                 m.fechaHora());
     }
 }

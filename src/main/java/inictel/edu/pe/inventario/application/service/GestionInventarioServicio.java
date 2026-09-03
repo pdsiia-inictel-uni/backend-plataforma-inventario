@@ -12,6 +12,7 @@ import inictel.edu.pe.inventario.application.comando.GuardarEquipoComando;
 import inictel.edu.pe.inventario.application.dto.EquipoDto;
 import inictel.edu.pe.inventario.application.dto.EquipoResumenDto;
 import inictel.edu.pe.inventario.application.dto.MovimientoDto;
+import inictel.edu.pe.inventario.application.dto.ResponsableEquipoDto;
 import inictel.edu.pe.inventario.domain.model.Categoria;
 import inictel.edu.pe.inventario.domain.model.CodigoBien;
 import inictel.edu.pe.inventario.domain.model.CondicionEquipo;
@@ -31,7 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Casos de uso del inventario de bienes (RF-34 .. RF-57).
@@ -77,17 +81,96 @@ public class GestionInventarioServicio {
     // ------------------------------------------------------------------
 
     /**
-     * RF-47, RF-49: listado paginado.
+     * RF-47, RF-49, RF-84: listado paginado.
      *
      * <p>El Responsable y el Operador ven siempre su Coordinacion, envien lo que
      * envien. El Administrador debe elegir cual consultar (RF-49); sin eleccion
      * ve toda la institucion.</p>
+     *
+     * <p>Cada fila dice quien tiene el bien a su cargo, que es lo que convierte
+     * el listado en un reparto y no solo en un catalogo (RF-83). Los nombres se
+     * resuelven contra una memoria de la propia pagina: sin ella, una tabla de
+     * cincuenta equipos de tres operadores pedia cincuenta veces los mismos
+     * tres nombres (RNF-12).</p>
      */
     @Transactional(readOnly = true)
     public Pagina<EquipoResumenDto> buscar(FiltroEquipos filtro, CriterioPagina criterio) {
+        Map<Long, String> nombres = new HashMap<>();
         return equipos.buscar(acotar(filtro), criterio)
                 .mapear(equipo -> EquipoResumenDto.de(equipo,
-                        ubicaciones.nombreDeLaboratorio(equipo.getLaboratorioId()).orElse(null)));
+                        ubicaciones.nombreDeLaboratorio(equipo.getLaboratorioId()).orElse(null),
+                        nombreDeQuienLoTieneACargo(equipo, nombres)));
+    }
+
+    /**
+     * RF-84: quien lleva equipos en la Coordinacion, y cuantos lleva cada uno.
+     *
+     * <p>Es lo que hace posible el listado por responsable de equipo: sin este
+     * reparto, elegir "los equipos de fulano" obligaria a recorrer la lista de
+     * operadores de la Coordinacion probando uno por uno cual tiene algo. La
+     * primera opcion es siempre la del Responsable —los bienes sin asignacion,
+     * que son suyos por definicion (RN-37)— y las demas van por apellido.</p>
+     *
+     * <p>El Administrador consulta la Coordinacion que elija y esta obligado a
+     * elegir una: el reparto de bienes es un asunto interno de cada
+     * Coordinacion y mezclarlas juntaria en una sola fila a los responsables de
+     * todas ellas (RF-49, RN-23).</p>
+     */
+    @Transactional(readOnly = true)
+    public List<ResponsableEquipoDto> responsablesDeEquipo(Long coordinacionId) {
+        UsuarioAutenticado actual = contexto.requerido();
+        Long ambito = actual.ambitoDeConsulta(coordinacionId);
+        if (ambito == null) {
+            throw new DatosInvalidosException("coordinacionId",
+                    "Elija la coordinacion cuyo reparto de equipos desea consultar.");
+        }
+
+        Long responsableCoordinacion = directorio.responsableVigenteDe(ambito).orElse(null);
+
+        return equipos.contarPorResponsableDeEquipo(ambito).stream()
+                .map(conteo -> componerResponsable(conteo, responsableCoordinacion))
+                .sorted(Comparator
+                        .comparing(ResponsableEquipoDto::esResponsableCoordinacion).reversed()
+                        .thenComparing(ResponsableEquipoDto::nombreCompleto,
+                                String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /**
+     * Una fila del reparto. La del identificador nulo es la del Responsable de
+     * la Coordinacion: sus bienes son los que no tienen asignacion (RN-37).
+     */
+    private ResponsableEquipoDto componerResponsable(EquipoRepositorio.ConteoACargo conteo,
+                                                     Long responsableCoordinacion) {
+        if (conteo.responsableEquipoId() == null) {
+            String nombre = directorio.nombreDe(responsableCoordinacion)
+                    // RN-07: una Coordinacion puede estar parada, sin responsable
+                    // nombrado, y sus bienes siguen ahi esperando a quien llegue.
+                    .orElse("Responsable de la coordinacion");
+            return new ResponsableEquipoDto(null, nombre, true, conteo.cantidad());
+        }
+        String nombre = directorio.nombreDe(conteo.responsableEquipoId())
+                .orElse("Operador #" + conteo.responsableEquipoId());
+        return new ResponsableEquipoDto(conteo.responsableEquipoId(), nombre, false, conteo.cantidad());
+    }
+
+    /**
+     * RF-83: quien responde por el bien hoy, con memoria de los ya resueltos.
+     *
+     * <p>El Operador a su cargo si lo tiene; si no, el Responsable vigente de
+     * la Coordinacion, que es lo que significa no tenerlo (RN-37).</p>
+     */
+    private String nombreDeQuienLoTieneACargo(Equipo equipo, Map<Long, String> memoria) {
+        if (equipo.estaACargoDeUnOperador()) {
+            return memoria.computeIfAbsent(equipo.getResponsableEquipoId(),
+                    id -> directorio.nombreDe(id).orElse(null));
+        }
+        // Clave negativa: la coordinacion y el usuario comparten memoria, y un
+        // identificador de coordinacion podria coincidir con uno de persona.
+        return memoria.computeIfAbsent(-equipo.getCoordinacionId(),
+                id -> directorio.responsableVigenteDe(-id)
+                        .flatMap(directorio::nombreDe)
+                        .orElse(null));
     }
 
     @Transactional(readOnly = true)

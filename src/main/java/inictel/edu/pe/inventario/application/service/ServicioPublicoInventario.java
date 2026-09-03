@@ -122,6 +122,29 @@ public class ServicioPublicoInventario {
     }
 
     /**
+     * Los bienes en servicio a nombre de esa persona, nombrados uno a uno.
+     *
+     * <p>Los pide {@code iam} para poder decir, cuando la baja de un Operador
+     * se rechaza, <b>cuales</b> son los equipos que lo retienen y donde estan.
+     * Con el numero a secas el Responsable tenia que ir a buscarlos al
+     * inventario para saber que reasignar (RN-38, RNF-23).</p>
+     */
+    @Transactional(readOnly = true)
+    public List<BienACargoDto> listarBienesACargoDe(Long usuarioId) {
+        return equipos.listarACargoDe(usuarioId).stream()
+                .map(equipo -> new BienACargoDto(
+                        equipo.getId(),
+                        equipo.getNombre(),
+                        equipo.getCodigoInventario().valor(),
+                        ubicaciones.nombreDeLaboratorio(equipo.getLaboratorioId()).orElse(null)))
+                .toList();
+    }
+
+    /** Lo justo para reconocer un equipo que impide una baja (RN-38). */
+    public record BienACargoDto(Long id, String nombre, String codigoInventario, String laboratorio) {
+    }
+
+    /**
      * Devuelve al Responsable de la Coordinacion todos los bienes que esa
      * persona tenia a su nombre.
      *

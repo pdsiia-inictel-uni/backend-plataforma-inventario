@@ -35,9 +35,8 @@ public interface UsuarioJpaRepository
     /**
      * RN-06: como maximo uno; el indice unico parcial de la base lo garantiza.
      *
-     * <p>Vale la suspendida: quien esta de vacaciones sigue siendo el
-     * Responsable de su Coordinacion y vuelve a su puesto (RF-22b). La de baja
-     * no aparece nunca por aqui, porque la baja libera el puesto (RN-34).</p>
+     * <p>La cuenta de baja no aparece nunca por aqui, porque la baja libera el
+     * puesto en el mismo acto (RN-34).</p>
      */
     @Query("""
             SELECT u FROM UsuarioJpaEntity u JOIN u.asignaciones a
@@ -58,7 +57,7 @@ public interface UsuarioJpaRepository
     List<UsuarioJpaEntity> listarPorCoordinacion(@Param("coordinacionId") Long coordinacionId,
                                                  @Param("soloActivos") boolean soloActivos);
 
-    /** RF-15: gente de la Coordinacion. La suspendida cuenta: sigue siendo suya. */
+    /** RF-15: gente de la Coordinacion. La de baja no cuenta: ya dejo su puesto (RN-34). */
     @Query("""
             SELECT COUNT(u) FROM UsuarioJpaEntity u JOIN u.asignaciones a
             WHERE a.coordinacionId = :coordinacionId

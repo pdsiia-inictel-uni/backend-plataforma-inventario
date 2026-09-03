@@ -6,461 +6,57 @@
 
 | Campo | Valor |
 | --- | --- |
-| Versión | 3.11 |
+| Versión | 3.12 |
 | Fecha | Septiembre 2026 |
-| Reemplaza a | Versión 3.10 (la fotografía del bien al alcance del Operador y fuera de la edición, los reportes en color y sin identificar, y el símbolo S/ montado sobre el importe) |
+| Reemplaza a | Versión 3.11 (la suspensión temporal de cuentas, la baja que solo avisaba al rechazarse, el inventario que no se podía listar por quien custodia cada equipo y la ficha del bien que repetía dos autorías) |
 | Estándar base | IEEE 830 / ISO/IEC/IEEE 29148 (adaptado) |
 | Arquitectura | Domain-Driven Design — monolito modular por contextos delimitados |
+| Estado | Implementado en su totalidad y verificado (anexo B) |
 
 ---
 
-## 0. Resumen de cambios respecto a la versión 3.10
+## Cómo leer este documento
 
-La versión 3.11 no toca el esquema de la base, ni los préstamos, ni el
-historial, ni el responsable del equipo que estrenó la 3.10. Cambia **quién
-puede poner la fotografía de un bien y desde dónde**, **cómo se ven los
-reportes impresos** y corrige un fallo de estilo que la propia 3.10 había
-introducido.
+Este documento es a la vez la **especificación** del sistema y su
+**documentación oficial**: describe lo que el sistema hace hoy, no lo que se
+espera que haga algún día. Cada requisito enunciado aquí está implementado y
+verificado; lo que no está implementado no aparece.
 
-Tres observaciones la motivan. La fotografía era la única escritura que un
-Operador podía hacer sobre un equipo **ya registrado**: se subía desde la ficha,
-suelta y sin confirmar nada, mientras que todos los demás datos del bien —hasta
-el más pequeño— pasan por *Editar* y por su revisión. Los reportes salían en
-azul corporativo con cabeceras de fondo oscuro y filas alternas grisáceas, y se
-imprimen en impresoras comunes para archivarse en papel, donde el color no
-aporta jerarquía y sí gasta tóner; y además no decían de quién eran: un listado
-de bienes sin la institución ni la Dirección no se le puede presentar a nadie. Y
-el símbolo **S/** del campo *Costo en soles* se había montado encima del importe.
+Su estructura sigue tres capas de lectura:
 
-| Id | Cambio |
+| Si usted es… | Empiece por | Y continúe con |
+| --- | --- | --- |
+| **Personal de la institución** que va a usar el sistema | [2.3 Segmentos objetivo](#23-segmentos-objetivo-usuarios-del-sistema) y [8. Diseño de interfaz](#8-diseño-de-interfaz-por-segmento-objetivo) | [6. Matriz de permisos](#6-matriz-de-permisos-por-rol), que dice qué puede hacer cada rol |
+| **Responsable funcional** que valida el sistema | [3. Requisitos funcionales](#3-requisitos-funcionales) | [7. Reglas de negocio](#7-reglas-de-negocio-invariantes) y [11. Criterios de aceptación](#11-criterios-de-aceptación) |
+| **Personal técnico** que lo mantiene o lo despliega | [9. Arquitectura del software](#9-arquitectura-del-software) | [5. Modelo de datos](#5-modelo-de-datos), [10. Interfaces](#10-interfaces-del-sistema) y [12. Instalación y despliegue](#12-instalación-configuración-y-despliegue) |
+
+**Cómo se citan las cosas.** `RF-nn` es un requisito funcional (sección 3),
+`RNF-nn` uno no funcional (sección 4) y `RN-nn` una regla de negocio invariante
+(sección 7). Las reglas de negocio son las que no admiten excepción: si un
+requisito y una regla parecen contradecirse, manda la regla.
+
+---
+
+## Índice
+
+| Sección | Contenido |
 | --- | --- |
-| V311-01 | **La fotografía de un equipo registrado la pone solo el Responsable.** `POST /api/equipos/{id}/foto` pasa de admitir `RESPONSABLE` y `OPERADOR` a admitir solo al primero, y el servicio comprueba lo mismo con el guardián que ya usaban editar, mantenimiento y baja. Era la última rendija: sobre un bien ya inventariado el Operador no escribe nada (RF-45), y una fotografía es un dato del bien como el modelo o el laboratorio (RF-51c). |
-| V311-02 | **La fotografía se cambia desde *Editar*, con el resto de los datos.** Deja de subirse desde la ficha —donde iba suelta, se guardaba al elegir el archivo y no pasaba por ninguna revisión— y pasa a ser una sección del formulario de edición, con la cámara del dispositivo o un archivo, y se confirma junto a todo lo demás en el paso de resumen (RF-51c, RNF-26). La ficha la sigue enseñando y ampliando, y dice dónde se cambia. |
-| V311-03 | **En el alta, la fotografía la ofrece el formulario solo a quien puede ponerla.** El Operador registra el equipo sin ella y el Responsable la adjunta después desde *Editar*. El rótulo del paso cambia con el rol —"Adquisición, ubicación y fotografía" o "Adquisición y ubicación"—, porque anunciar un paso con algo que no va a aparecer es prometer lo que no se cumple (RNF-23). |
-| V311-04 | **Los tres reportes del inventario salen en blanco y negro.** Excel, CSV y PDF pierden el azul de marca, el fondo oscuro de las cabeceras y el sombreado alterno de las filas. La jerarquía la marcan ahora el tamaño, la negrita y las líneas: en Excel la cabecera lleva borde y línea inferior gruesa; en el PDF, cada celda su recuadro. Se imprimen para archivarse, y un reporte que depende del color no sobrevive a una impresora en blanco y negro (RF-52). |
-| V311-05 | **El formato de registro de salida también.** Sus bandas de sección, que iban en azul con texto blanco, pasan a texto negro con una línea inferior gruesa; las etiquetas pierden su fondo gris y las líneas pasan a negro. Es un papel que se imprime cada vez que sale un equipo, se firma a mano y se archiva (RF-78). |
-| V311-06 | **Los reportes dicen de quién son.** Encabezan con **Sede Central INICTEL-UNI**, con el nombre completo de la **Dirección** y con el de la **Coordinación** —las tres cosas, en ese orden—, seguidas de qué es el documento y de cuándo se generó. Cuando el Administrador exporta la institución entera, la línea lo dice con esas palabras en lugar de dejar el hueco vacío. El formato de registro de salida gana también la línea de la Dirección, que es la que le faltaba para identificar la dependencia del equipo que sale (RF-52b). |
-| V311-07 | **El símbolo S/ vuelve a su sitio.** La v3.10 reescribió la regla de estilo de los campos como `input:not(...):not(...)`, y eso, además de cubrir los tipos que faltaban, **multiplicó su especificidad**: la regla base pasó a ganarle a todas las que la matizan y las anuló en silencio. El importe perdió su sangría izquierda y se montó bajo el "S/"; el campo inválido perdió su borde rojo y el foco su anillo, aunque nadie había llegado a verlo todavía. La exclusión se envuelve en `:where()`, que no suma especificidad, de modo que la regla pesa lo mínimo y cada matiz vuelve a ganarle (RNF-22). |
-
-**Lo que no cambia.** El esquema de la base queda exactamente como lo dejó la
-v3.10: ni una columna. La fotografía sigue siendo opcional y sigue sin
-condicionar el alta (RN-29); el visor a tamaño completo de la ficha, con su
-cierre por teclado, queda intacto (RNF-32). Los datos de los reportes son los
-mismos y en el mismo orden: lo que cambia es cómo se ven y qué dicen de sí
-mismos.
-
----
-
-## 0.1 Resumen de cambios de la versión 3.10 respecto a la 3.9
-
-La versión 3.10 no toca la jerarquía organizacional, ni los préstamos, ni el
-historial inmutable, ni el formato de registro de uso, ni la CSP. Es la
-primera desde la 3.7 que **cambia el esquema de la base**, y lo hace en la
-tabla del bien: una columna se sustituye y otra se añade. La base sigue vacía,
-de modo que la línea base se rehace en lugar de parchearse, como permite
-RNF-43 mientras el sistema no esté instalado (sección 5).
-
-Tres observaciones la motivan. El formato de registro de uso pide la **fecha
-de adquisición** —la de la orden de compra— y el sistema solo guardaba el
-año: el documento salía con "2024" donde debía decir "18/11/2024", y guardar
-menos de lo que el documento necesita obliga a rellenarlo a mano con un dato
-que el sistema ya debería conocer. El inventario decía a nombre de quién
-estaba cada equipo —del Responsable, todos— pero no **quién lo tiene**, que es
-la pregunta que se hace cuando hay que ir a buscar uno; y en un laboratorio
-los equipos los custodian los operadores, cada uno los suyos. Y los campos de
-teléfono y de hora salían con otra altura, otro borde y otro ancho que los de
-al lado, porque la hoja de estilos enumeraba los tipos de campo uno a uno y a
-esos dos no los nombraba.
-
-| Id | Cambio |
-| --- | --- |
-| V310-01 | **El bien guarda la fecha de adquisición, no el año.** `equipo.anio_adquisicion INTEGER` pasa a ser `equipo.fecha_adquisicion DATE`, y con ella el formato de registro de uso imprime la fecha de la orden de compra tal como el papel la pide (RF-78). El formulario de alta cambia el campo numérico por un calendario acotado entre el 1 de enero de 1980 y hoy; el listado ordena por ella y la muestra en `dd/MM/yyyy`. La regla no cambia de fondo: la adquisición sigue sin poder ser futura (RN-25), solo que ahora se comprueba al día y no al año. |
-| V310-02 | **Cada equipo tiene un responsable de equipo, y es un Operador.** Nueva columna `equipo.responsable_equipo_id`. Responde a "quién lo tiene", que no es lo mismo que "quién responde por el inventario": el segundo es el Responsable de la Coordinación y ya estaba (RF-36); el primero es la persona que lo custodia día a día (RF-83). **`NULL` no es un hueco**: significa que lo lleva el Responsable, sea quien sea en cada momento. Así nace todo bien —también el que registra un Operador, que registrarlo no es quedárselo— y ahí vuelve cuando se le retira a alguien (RN-37). |
-| V310-03 | **Solo el Responsable reparte los equipos de su Coordinación.** `PUT /api/equipos/{id}/responsable-equipo` es suyo y de nadie más: es quien reparte el trabajo y quien responde por el inventario entero. Un Operador no se asigna equipos a sí mismo ni se los pasa a un compañero. Se entrega únicamente a un **Operador activo de la misma Coordinación** —a un suspendido o a un dado de baja no se le entrega nada— y el propio Responsable puede quedárselo con un clic, que es lo que la pantalla llama *dejarlo a mi cargo* (RF-83, RN-37). |
-| V310-04 | **Quien tiene equipos a su cargo no deja su puesto.** Un Operador con bienes a su nombre no se puede dar de baja ni retirar de su Coordinación —y por tanto tampoco mover a otra, que es retirarlo y volverlo a asignar—: antes, el Responsable tiene que entregarlos a otro Operador o quedárselos. El mensaje dice cuántos son y cuál es la salida. La **suspensión sí se permite**: conserva el puesto y la persona vuelve a él, así que sus equipos siguen siendo suyos (RN-38, RF-22b). |
-| V310-05 | **La regla la sostiene también la base.** `equipo.responsable_equipo_id` no apunta al usuario sino a su **asignación**: la llave foránea es `(responsable_equipo_id, coordinacion_id) → usuario_coordinacion (usuario_id, coordinacion_id)`. Con eso la base garantiza por sí misma las dos mitades de la regla —no se puede poner a cargo a alguien de otra Coordinación, y no se puede borrar la asignación de quien tiene bienes a su nombre— igual que ya hacía con el laboratorio del bien (RN-12) y con el responsable único de cada Coordinación (RN-06). Se declara aplazable porque cambiar el rol de una persona reescribe su fila dentro de la misma transacción (sección 5). |
-| V310-06 | **Dos sueltas automáticas, y solo dos.** La **baja de un bien** lo suelta: un equipo fuera de servicio no está a cargo de nadie, y si contara ataría a su operador a un equipo que ya no existe. Y el **ascenso de un Operador a Responsable** de su propia Coordinación (RF-26b) suelta los suyos: los sigue llevando la misma persona, pero pasa a llevarlos como Responsable, que es justamente lo que significa un bien sin asignación. Las dos quedan registradas en el historial del bien. |
-| V310-07 | **El cambio de responsable deja rastro.** Nuevo tipo de movimiento `RESPONSABLE` en el historial inmutable del bien, con la frase de quién a quién. La línea de tiempo de la ficha sí lo muestra —al contrario que las ediciones, retiradas en la v3.9—: quién custodia un equipo es parte de su historia, y en un inventario patrimonial es de las cosas que hay que poder reconstruir (RF-53, RN-21). |
-| V310-08 | **Todo campo de escritura se ve igual, sea del tipo que sea.** La regla de estilo enumeraba los tipos uno a uno —`text`, `password`, `email`, `number`, `date`, `search`— y bastaba usar uno que no estuviera en la lista para que el campo saliera con el aspecto por defecto del navegador: otra altura, otro borde, otra tipografía y sin ocupar el ancho de su columna. Le pasaba a **Teléfono de contacto**, **Celular** y **Hora** del formato de registro de uso, que son `tel` y `time`. Enumerar no escala: cada campo nuevo de un tipo distinto nacía descolocado. La regla se invierte —todos menos los que no son cajas de texto— y el problema no puede repetirse. Fecha y hora reciben además la normalización que WebKit necesita para no quedar más bajos que sus vecinos (RNF-22). |
-
-**Lo que no cambia.** El bien sigue perteneciendo a una sola Coordinación y no
-sale de ella (RN-11); `equipo.responsable_id` sigue siendo lo que era, el
-Responsable vigente **al dar de alta** el bien (RF-36), y en la ficha se rotula
-así para no confundirlo con el nuevo. El préstamo no se toca: prestar un
-equipo no cambia quién lo tiene a su cargo, porque la salida es temporal y la
-custodia no. El formato de registro de uso sigue sin guardarse (RN-36) y la
-CSP sigue sin `'unsafe-inline'` ni `'unsafe-eval'`.
+| [1. Introducción](#1-introducción) | Propósito, alcance, definiciones y tecnologías |
+| [2. Descripción general](#2-descripción-general) | Perspectiva del producto, jerarquía organizacional, a quién sirve y qué lo restringe |
+| [3. Requisitos funcionales](#3-requisitos-funcionales) | Los nueve módulos vigentes del sistema, requisito por requisito. El módulo 8 se suprimió en la 3.0 y conserva su número para que las referencias antiguas no engañen |
+| [4. Requisitos no funcionales](#4-requisitos-no-funcionales) | Seguridad, rendimiento, disponibilidad, usabilidad, mantenibilidad y marco legal |
+| [5. Modelo de datos](#5-modelo-de-datos) | Las nueve tablas, sus restricciones y lo que la base garantiza por sí sola |
+| [6. Matriz de permisos por rol](#6-matriz-de-permisos-por-rol) | Qué puede hacer cada rol, operación por operación |
+| [7. Reglas de negocio invariantes](#7-reglas-de-negocio-invariantes) | Las condiciones que el sistema no permite violar por ninguna vía |
+| [8. Diseño de interfaz por segmento objetivo](#8-diseño-de-interfaz-por-segmento-objetivo) | Cada pantalla, para quién es y por qué está resuelta así |
+| [9. Arquitectura del software](#9-arquitectura-del-software) | Contextos delimitados, capas, cómo hablan entre sí y dónde vive cada cosa |
+| [10. Interfaces del sistema](#10-interfaces-del-sistema) | Rutas de la aplicación y catálogo completo de la API |
+| [11. Criterios de aceptación](#11-criterios-de-aceptación) | Lo comprobable, agrupado por materia |
+| [12. Instalación, configuración y despliegue](#12-instalación-configuración-y-despliegue) | Requisitos previos, variables de entorno, arranque y migraciones |
+| [Anexo A. Historial de versiones](#anexo-a-historial-de-versiones) | Qué cambió en cada versión y por qué |
+| [Anexo B. Estado de la implementación](#anexo-b-estado-de-la-implementación) | Dónde vive en el código cada cambio de cada versión |
 
 ---
-
-## 0.2 Resumen de cambios de la versión 3.9 respecto a la 3.8
-
-La versión 3.9 no toca la jerarquía organizacional, ni el modelo del bien, ni
-el préstamo, ni el historial inmutable, ni la matriz de permisos, ni una sola
-regla de negocio de las que ya estaban. El esquema de la base **no cambia**:
-ni una columna, ni una tabla, ni una migración nueva. Cambia **cómo se da de
-alta a un operador**, **por dónde abren los dos listados**, **qué se ve y qué
-no se ve en la ficha de un equipo** y añade **un documento que el laboratorio
-imprime y firma**.
-
-Cuatro observaciones del uso real la motivan. El Responsable que registraba a
-un operador acertaba casi siempre, y cuando no acertaba se quedaba sin salida:
-el alta eran dos peticiones encadenadas desde el navegador y, si la segunda
-fallaba, la persona quedaba registrada **sin puesto**, invisible en su
-pantalla y con el DNI ya ocupado, de modo que no podía ni corregirla ni
-repetirla. El inventario y los préstamos abrían por una vista parcial
-—"Operativos", "Activos"— sin decirlo, así que quien no encontraba un equipo
-concluía que no estaba registrado cuando lo único que pasaba es que estaba
-prestado. La ficha del bien contaba dos veces la misma salida, en la tabla de
-préstamos y en la línea de tiempo, y ninguna de las dos veces enseñaba lo que
-de verdad se consulta: qué se dijo al entregarlo y qué se dijo al recibirlo. Y
-el laboratorio seguía rellenando a mano, en un documento aparte, un formato de
-uso cuyos datos de equipo ya estaban en el sistema.
-
-| Id | Cambio |
-| --- | --- |
-| V39-01 | **El alta de un operador es un solo acto también para el servidor.** `POST /api/usuarios/con-puesto` registra a la persona y le da su puesto **en una transacción**: o queda el operador entero, con su contraseña, o no queda nada. Hasta la v3.8 el cliente encadenaba `POST /api/usuarios` y `POST /api/usuarios/{id}/asignaciones`, y las dos podían fallar por separado. Cuando fallaba la segunda —la coordinación desactivada, un corte de red, la sesión caducada entre una y otra— la persona quedaba registrada sin rol y sin coordinación, y el Responsable **no podía verla** (su lista está acotada a su Coordinación, y quien no tiene ninguna no aparece en ella), **no podía editarla** (solo gestiona a los operadores de la suya, y aquello no era operador de nadie) y **no podía volver a registrarla**, porque su DNI, su correo y su usuario ya estaban tomados. El alta se convertía en un callejón sin salida que solo el Administrador podía deshacer (RF-16e, RNF-17b). |
-| V39-02 | **El error del alta se señala en el campo que hay que corregir.** El formulario del Responsable entrega los datos y es la pantalla de fuera quien los envía, así que la respuesta del servidor llegaba a otro sitio: un DNI repetido se anunciaba en un aviso flotante genérico —"No se pudo registrar al operador"— y ninguno de los siete campos quedaba marcado. Ahora los errores por campo vuelven al formulario, que sigue abierto con lo escrito (RNF-25). La ventana de confirmación dice además, antes de aceptar, qué va a pasar además de guardar los datos: que la persona queda como operador de esta coordinación y que el sistema va a generar su contraseña (RNF-26). |
-| V39-03 | **"Todos" es la primera pestaña y la que viene activa, en inventario y en préstamos.** La pantalla empieza enseñando todo lo que hay y el usuario acota desde ahí; el resto de pestañas conserva su orden. Abrir por "Operativos" respondía a "qué tengo disponible", que es una buena pregunta pero no es la que trae aquí: quien busca un equipo concreto y no lo encuentra no concluye que está prestado, concluye que no está registrado. Lo mismo en préstamos con "Activos", que escondía justamente el histórico que se viene a consultar (RF-47, RF-67). |
-| V39-04 | **La ficha del bien deja de contar dos veces la misma salida.** La línea de tiempo del equipo ya no repite los préstamos ni las devoluciones —tienen su propia tabla, en esa misma ficha y con más datos— ni muestra las **ediciones**: quién corrigió un modelo mal escrito no es parte de la historia del equipo, que es dónde estuvo, en qué condición y con quién. El movimiento se sigue registrando en el historial inmutable, que no se toca (RN-21, RF-56): lo que cambia es qué enseña la pantalla. |
-| V39-05 | **Cada préstamo de la ficha se abre.** Un botón **Ver detalle** por fila muestra lo que no cabía en ella y es justamente lo que se consulta cuando algo no cuadra: **quién entregó el equipo y a quién**, las **observaciones de entrega**, y del otro lado **quién recibió la devolución**, en qué estado volvió y las **observaciones de retorno**. Esas dos observaciones son la única constancia de cómo salió y cómo volvió el bien (RN-18) y hasta la v3.8 no se veían en ninguna pantalla de la ficha (RF-66b). |
-| V39-06 | **El Responsable puede emitir el formato de registro de uso de un equipo, en PDF.** Es el papel que el laboratorio hace firmar cuando un equipo sale a trabajar, con sus diez puntos y en su orden. El sistema rellena lo que ya sabe —descripción, código patrimonial, código de inventario, marca, modelo, número de serie, valor de compra, año de adquisición, área y **la condición en que el bien está ahora mismo**— y deja en blanco lo que solo saben las personas. El documento **se ve entero antes de descargarse**: un papel que se va a firmar no se descarga a ciegas (RF-78, RF-79). |
-| V39-07 | **El formato genera un documento y nada más.** No se guarda en ninguna tabla, no deja movimiento en el historial del bien, no crea un préstamo y **no cambia la condición del equipo**: después de emitirlo el bien sigue Operativo, si lo estaba. Es deliberado y es una regla nueva del sistema (RN-36). Por eso la pantalla lo recuerda dos veces —al enseñar el documento y al descargarlo— y el propio PDF lo lleva impreso al pie: el papel firmado y el registro del préstamo son dos cosas distintas, y hay que hacer las dos (RF-59, RF-79). |
-| V39-08 | **La CSP gana una directiva y no pierde ninguna.** `frame-src 'self' blob:`, que es lo que permite mostrar en un marco el PDF que el servidor acaba de devolver. Ni `script-src` ni `style-src` admiten nada nuevo, sigue sin haber `'unsafe-inline'` ni `'unsafe-eval'` en ninguna directiva, y `object-src` sigue en `'none'`. La prueba de regresión comprueba ahora también esta directiva (RNF-07, csp.spec.ts). |
-
-**Lo que no cambia.** El alta en dos actos del Administrador sigue siendo dos
-actos, porque en su pantalla el puesto es justamente lo que está por decidir
-(RF-16b, RF-28d): el acto único es del Responsable, que solo puede crear
-operadores y solo en su Coordinación. El préstamo se registra como siempre y
-con la misma pantalla (RF-59). El historial del bien conserva todos sus
-movimientos, incluidos los que la ficha ya no muestra. Y el esquema de la base
-queda exactamente como estaba: la v3.9 no ha exigido ninguna migración.
-
----
-
-## 0.3 Resumen de cambios de la versión 3.8 respecto a la 3.7
-
-La versión 3.8 no toca la jerarquía organizacional, ni el modelo del bien, ni
-los préstamos, ni el historial, ni los estados de cuenta, ni una sola regla de
-negocio. Ningún rol gana ni pierde una capacidad y el esquema de la base no
-cambia. Cambia **cómo se lee la interfaz**, **cuánto texto la acompaña**,
-**cuántas pantallas cuesta registrar un equipo** y, por fin, **cómo se
-instala**.
-
-Cuatro observaciones la motivan. La aplicación entera estaba escrita sin
-tildes —"Contrasena", "Gestion", "Coordinacion"— salvo unas pocas etiquetas
-sueltas que sí las llevaban, que es peor que no llevarlas ninguna: para una
-institución peruana esa es la primera cosa que resta seriedad, antes que
-cualquier decisión de color o de espaciado. Cada pantalla se explicaba a sí
-misma con recuadros de prosa que repetían lo que ya se veía, hasta el punto de
-que un formulario de cuatro campos llevaba tres párrafos alrededor. Registrar
-un equipo pedía seis pantallas para once datos, la mitad de ellas con dos
-campos. Y el sistema, pese a que RNF-44 lo exigía desde la 2.0, no tenía
-Dockerfile ni forma de desplegarse.
-
-| Id | Cambio |
-| --- | --- |
-| V38-01 | **La interfaz se escribe en español correcto.** Tildes y eñes en todo el texto que lee el usuario: las plantillas, las cadenas de los componentes y los datos que el sistema trae puestos —las dos Direcciones y las ocho categorías de `V2`—. No se tocó ningún identificador: `equipo.condicion` sigue llamándose así, y lo que cambió es la cabecera que lo rotula, `CONDICIÓN`. Quedan fuera a propósito las palabras que cambian de significado con la tilde (*esta/está*, *si/sí*, *que/qué*), porque acertar en el 95% y estropear el 5% es peor que no tocar (RNF-21, RNF-29). |
-| V38-02 | **Desaparecen los recuadros de aviso.** Los 36 bloques de prosa explicativa que encabezaban listados y formularios se retiran, y con ellos la costumbre de contar en un párrafo lo que la pantalla ya enseña. Sobreviven dos: los que muestran el error que devuelve el servidor, sin los cuales un rechazo de credenciales no se vería en ninguna parte. La validación junto al campo, los estados vacíos explicativos y las ventanas de confirmación quedan intactos (RNF-24, RNF-25, RNF-26). |
-| V38-03 | **Registrar un equipo son tres pantallas, no seis.** *Identificación y códigos* juntos —son la misma pregunta, cuál es este equipo, y se responden con el aparato delante y su etiqueta a la vista—; *adquisición, ubicación y fotografía* juntos —tres grupos cortos que no llenan una pantalla—; y el *resumen*, solo (RNF-28, ERS 8.4). |
-| V38-04 | **Las barras de los dos paneles vuelven a decir algo.** Llevaban vacías desde que existen: el relleno es un `<span>` dentro de un contenedor que no es flex, de modo que quedaba en flujo *inline*, y un elemento inline ignora la anchura. El navegador recibía `width: 33%` y lo pintaba a 0 px. Una línea de CSS (RF-76). |
-| V38-05 | **La acción principal deja de moverse.** Una descripción larga la empujaba al renglón siguiente y aparecía abajo a la izquierda, que es donde ya nadie la busca; ocurría en Personas y entre una Dirección y la otra. Las descripciones se limitan además a la medida de lectura (RNF-27). |
-| V38-06 | **La tabla del inventario se lee.** Los códigos dejan de partirse a mitad —"INV-2024-" en una línea y "0102" en la siguiente no es un código—, la fila baja de 150 a 92 px y la columna de acciones queda fijada al borde derecho, de modo que sus botones no se van fuera de la pantalla (RF-47, RNF-22). |
-| V38-07 | **El sistema se despliega.** Dos imágenes en dos etapas, `docker compose`, nginx sirviendo la aplicación y reenviando `/api` al backend, y toda la configuración por variables de entorno. Nginx emite además las cabeceras de endurecimiento, porque Spring solo las pone en lo que él sirve —la API— y quien entrega el HTML es nginx (RNF-07, RNF-09, RNF-44, RNF-45). |
-
-**Lo que no cambia.** Ni una regla de negocio, ni un endpoint, ni una columna.
-Las 40 comprobaciones de las reglas documentadas se ejecutaron contra la imagen
-de producción y todas se cumplen. La CSP sigue sin `'unsafe-inline'` ni
-`'unsafe-eval'` en ninguna directiva, y su prueba de regresión sigue en verde.
-
----
-
-## 0.4 Resumen de cambios de la versión 3.7 respecto a la 3.6
-
-La versión 3.7 no toca la jerarquía organizacional, ni el modelo del bien, ni
-los préstamos, ni el historial, ni la CSP. Cambia **qué le puede pasar a la
-cuenta de una persona** y **cómo se cambia de puesto dentro de la
-institución**.
-
-Dos observaciones del uso real la motivan. La cuenta tenía un solo interruptor
-—activa o no—, y con él se resolvían dos cosas que no son la misma: quien se va
-de vacaciones y quien se va de la institución acababan en el mismo sitio, de
-modo que mirando la lista no había forma de saber a cuál de los dos se esperaba
-de vuelta, ni si su puesto seguía siendo suyo. Y cambiar a alguien de puesto
-—ascender a un operador, traer a alguien de otra coordinación, relevar a un
-responsable— exigía dos actos separados con la coordinación **parada** entre
-uno y otro: la baja del que estaba y, cuando se decidiera, el nombramiento del
-que entraba. Entre los dos, sus operadores no podían registrar ni un equipo
-(RN-07).
-
-| Id | Cambio |
-| --- | --- |
-| V37-01 | **La cuenta tiene tres estados, y dos de ellos son los que faltaban.** **Suspender** es temporal —vacaciones, un permiso, una licencia—: la persona no entra por ahora y **conserva su puesto**, porque va a volver a él. **Dar de baja** es la salida de la institución: la persona deja de entrar y **deja también su puesto**, porque quien ya no trabaja aquí no responde por un inventario ni figura entre los operadores de una Coordinación. Ninguno de los dos la borra: su nombre sigue en el historial de los equipos y préstamos que pasaron por sus manos (RF-22b, RN-34, RN-09). Se puede **reincorporar** a quien volvió, y vuelve como quien acaba de registrarse: con su cuenta y sin cargo. |
-| V37-02 | **El Administrador ejerce las dos sobre cualquiera** —responsables, operadores y otros administradores—, con dos límites que el servidor impone: no sobre sí mismo, y **nunca sobre el último Administrador activo**, ni suspendiéndolo ni dándolo de baja ni nombrándolo responsable de una Coordinación. Sin esa regla el sistema admite quedarse sin nadie que pueda repartir puestos (RF-25). El **Responsable** las ejerce sobre los **Operadores de su Coordinación**, y solo sobre ellos (RF-29). |
-| V37-03 | **Cambiar de puesto se hace en la Coordinación, con "Cambiar responsable", y es un solo acto.** Allí se elige entre quienes pueden tomarlo: una persona **sin puesto**, un **Operador de esa misma Coordinación** —que asciende sin cambiar de sitio— o un **Administrador** que baja al terreno. Nunca quien ya es Responsable de otra: nadie responde por dos inventarios a la vez (RF-26b, RN-35). El **saliente queda libre en la misma transacción**: sin rol y sin Coordinación, con su cuenta activa y su historial intacto. La Coordinación no pasa ni un instante sin responsable, que es lo que la partición en dos actos no podía evitar (RN-07). |
-| V37-04 | **La misma ventana nombra al primer responsable.** Una Coordinación recién creada ya no manda a otra pantalla a buscar a la persona: se elige aquí, entre los mismos candidatos, con la Coordinación delante. La ruta con encargo de `/personas` sigue funcionando para quien la tenga guardada, pero ninguna pantalla la genera (RF-26b, RF-28b). |
-| V37-05 | **El esquema declara el estado en lugar del interruptor.** `usuario.activo` desaparece y en su lugar está `usuario.estado` —`ACTIVA`, `SUSPENDIDA`, `BAJA`— con su restricción. La base no tenía datos, así que la línea base se rehace en lugar de parchearse, como permite RNF-43 mientras el sistema no esté instalado. |
-
-**Lo que no cambia.** El alta sigue partida en registro previo y asignación
-(RF-16b, RF-28d), y la asignación sigue dándose solo a quien no tiene puesto
-(RN-33): "Cambiar responsable" no es una excepción a esa regla sino la
-operación que sí sabe qué hacer con el puesto que la persona deja. El
-aislamiento por Coordinación, el historial del bien, la fotografía en el alta y
-la CSP estricta quedan intactos.
-
----
-
-## 0.5 Resumen de cambios de la versión 3.6 respecto a la 3.5
-
-La versión 3.6 no toca la jerarquía organizacional, ni el modelo de datos del
-bien, ni los préstamos, ni el historial, ni la CSP. Ningún rol gana ni pierde
-una capacidad. Cambia **a quién se le puede dar un puesto** y **cuándo se entera
-la pantalla de que los datos que muestra ya no son los que hay**.
-
-Dos observaciones del uso real la motivan. La v3.4 dejó dicho que el puesto de
-Responsable ocupado no se sustituye al asignar (RN-06), pero lo comprobaba
-mirando la Coordinación y no a la persona: quien ya era **administrador** no
-ocupaba ninguna, así que se colaba por esa rendija y podía convertirse en
-responsable u operador de un golpe —y quien lo hacía podía ser él mismo, con lo
-que se dejaba fuera de su propia pantalla—. Y las pantallas pedían sus datos una
-sola vez, al abrirse: un equipo prestado por el compañero de al lado, una
-coordinación que acababa de quedarse sin responsable o un puesto recién asignado
-seguían viéndose como estaban hasta que alguien pulsaba F5, cosa que solo hace
-quien ya sospecha que hay algo que ver.
-
-| Id | Cambio |
-| --- | --- |
-| V36-01 | **El puesto se asigna solo a quien no tiene ninguno, y nunca a uno mismo.** Vale para los tres roles: quien ya es administrador, responsable u operador no cambia de puesto por el hecho de que se le asigne otro, porque eso deja su Coordinación parada o su inventario sin quien lo registre sin que nadie lo haya decidido. Moverla sigue siendo lo que era desde la v3.4: la baja del puesto que tiene y, después, la asignación del nuevo (RN-33, RF-28d, RN-08). Y quien reparte los puestos no es quien los recibe: el Administrador no se asigna un puesto a sí mismo, como tampoco se desactiva su propia cuenta (RF-25). |
-| V36-02 | **Las pantallas se mantienen al día solas.** Cada listado, ficha y panel vuelve a preguntar al servidor cada 30 segundos mientras la pestaña está a la vista, y de inmediato al volver a ella; el armazón hace lo propio con el puesto de quien lo usa, de modo que un cambio de rol se ve en el menú sin cerrar sesión (RF-02, RNF-10). La recarga es silenciosa —sin indicador de carga ni avisos de error— y no ocurre mientras hay una ventana de confirmación abierta ni con la pestaña oculta (RNF-48). |
-| V36-03 | **La pantalla de personas deja de encabezarse con el panel "Coordinaciones sin responsable".** La coordinación parada ya se anuncia donde se administra —su cuadro en rojo en Direcciones, con su botón **Asignar responsable**, que sigue trayendo hasta aquí el encargo planteado (RF-15b, RF-28b)—. Tenerlo en dos sitios era decir dos veces lo mismo, y las dos versiones se contradicen en cuanto una envejece. La lista de personas queda con lo suyo: buscar a alguien y darle su puesto (RF-28). |
-| V36-04 | **El nombre de usuario y el correo institucional se escriben enteros, a mano.** El formulario los componía a partir del nombre real —`jperez`, `juan.perez@inictel-uni.edu.pe`— y acertaba a menudo, que es justo lo que lo hacía peligroso: las veces que no acertaba, el dato equivocado ya estaba escrito, con aspecto de correcto, y nadie relee lo que el propio formulario acaba de rellenar. Un campo vacío se ve; uno mal relleno, no. Además ninguno de los dos los decide el sistema: son los que la institución dio a esa persona (RF-16). |
-| V36-05 | **La lista de coordinaciones se pide al abrir la ventana de asignación, y un fallo deja de ser definitivo.** El cliente memorizaba la lista para no repetir la consulta en cada pantalla, pero memorizaba también el error: bastaba una petición rechazada —la que sale mientras el primer ingreso tiene pendiente el cambio de contraseña, cuando el servidor responde 403 a todo lo que no sea cambiarla (RF-06)— para que la lista quedara vacía en toda la sesión, sin decirlo. Entonces no se podía nombrar a ningún responsable ni operador, porque no había coordinación que elegir, y lo único que se dejaba asignar era el puesto de Administrador, que es el que no necesita ninguna. Ahora el fallo borra la memoria y la ventana vuelve a preguntar cada vez que se abre, así que una coordinación recién creada aparece sin recargar el navegador (RF-28d, RNF-48). |
-| V36-06 | **La persona sin puesto llega del servidor sin el campo `rol`, y el cliente lo completa al entrar.** La API serializa sin los campos nulos, así que quien está registrado sin puesto no trae `rol: null`: no trae `rol`. Para TypeScript son lo mismo, para una comparación no —`undefined !== null` es cierto—, y bastó eso para que la ventana de asignación creyera que toda persona recién registrada ya tenía puesto y no llegara a ofrecer ni el rol ni la Coordinación. Se normaliza en el adaptador, que es quien conoce el formato de la respuesta, y no en cada pantalla que la mira (RF-16b). |
-| V36-07 | **"Mi equipo humano" muestra el equipo, y solo el equipo.** Desaparecen la tarjeta con los datos del propio Responsable —quien abre esa pantalla es esa misma persona, y sus datos están en *Mi cuenta*— y el encabezado "Operadores" sobre la tabla de operadores, que repetía dos renglones más abajo lo que el título de la pantalla ya decía. Se conserva el recuento, que informa de algo (RF-29, RNF-22). |
-| V36-08 | **El Administrador vuelve a ver el inventario de la Coordinación que elige.** RF-46 y RF-49 nunca cambiaron —consulta todas las Coordinaciones, en solo lectura, eligiendo una cada vez—, pero la pantalla no llegaba a pedir el listado: la comprobación "¿ya eligió Coordinación?" era una señal calculada sobre un campo del formulario, que no es una señal, así que se quedaba con su primer valor —"todavía no"— y no volvía a calcularse nunca. El Administrador elegía la Coordinación, el selector cambiaba y la tabla seguía vacía, tuviera los equipos que tuviera. Le pasaba lo mismo a la pantalla de préstamos (RF-68). |
-| V36-09 | **La pantalla de acceso lleva de fondo una fotografía de INICTEL-UNI** (`assets/inictel.jpg`), con un velo suave del degradado de marca —un tercio de opacidad, lo justo para unificar el tono sin tapar la imagen—. El contraste del pie no lo sostiene el velo sino su propia sombra de texto, que funciona sobre cualquier zona de la fotografía, clara u oscura, y no obliga a oscurecerla entera (RNF-32). La imagen se declara en `styles.css` y se sirve desde el propio origen, así que la CSP no se relaja en ninguna directiva (RNF-07). |
-
-**Lo que no cambia.** Los dos actos del alta —registro previo y asignación— y,
-dentro de la asignación, la elección de **rol y Coordinación** tal como estaba
-(RF-28d): tres opciones de rol con su explicación al lado y, si el rol es
-operativo, el selector de Coordinación. La contraseña sigue naciendo con el
-puesto, la baja del Responsable sigue en la ficha de su Coordinación, y el
-aislamiento por Coordinación, el historial del bien y el esquema de la base
-quedan intactos. La v3.6 no ha exigido ninguna migración, ningún endpoint nuevo
-ni ninguno retirado.
-
----
-
-## 0.6 Resumen de cambios de la versión 3.5 respecto a la 3.4
-
-La versión 3.5 no toca el modelo de permisos, ni el aislamiento por
-Coordinación, ni el historial del bien, ni la CSP. Cambia **dónde se trabaja
-sobre una Coordinación**, **qué identifica a una persona** y **qué ocurre
-cuando una Coordinación se queda sin Responsable**. Y, aprovechando que la base
-está vacía, deja el esquema declarado de una vez en lugar de construido por
-parches.
-
-Cuatro observaciones del uso real la motivan. El cuadro de cada Coordinación se
-había ido llenando de controles —seis, en un espacio pensado para leerse de un
-vistazo— mientras que para ver sus laboratorios había que abrir otra ventana.
-La sigla de la Coordinación se quedaba vacía o se rellenaba con una abreviatura
-inventada en el momento, distinta en cada tarjeta. El segundo apellido, siendo
-opcional, se omitía por prisa, y quedaba media identidad registrada en el
-sistema que existe justamente para no confundir a dos personas. Y la baja del
-Responsable dejaba a la Coordinación parada solo a medias: sus Operadores no
-podían registrar equipos ni salidas, pero sí devoluciones.
-
-| Id | Cambio |
-| --- | --- |
-| V35-01 | **El cuadro de cada Coordinación se abre.** Un clic sobre él lleva a su **ficha**, donde están sus laboratorios —con su alta, su edición y su activación—, sus cifras y todas sus acciones: editar datos, ver inventario, activar o desactivar, y el puesto de Responsable. El cuadro conserva lo que sirve para comparar de un vistazo: responsable, tres cifras y estado (RF-15b). Desaparece la ventana suelta de laboratorios, que era un segundo camino al mismo sitio. |
-| V35-02 | **La Coordinación deja de tener sigla, también en la base de datos.** No se pide al crearla, no se muestra y no se guarda: la columna `coordinacion.sigla` no existe. Las Direcciones sí conservan la suya —DIDT y DCTT son como se las nombra en la institución— (RF-11, RF-10). |
-| V35-03 | **En la lista de personas, desactivar y activar salen de la fila.** Viven en la ficha, con el resto de lo que se hace sobre la cuenta de alguien. La fila queda con lo que la lista necesita: **Ver detalle** y **Asignar** (RF-28f). |
-| V35-04 | **El segundo apellido es obligatorio en toda alta y edición**, para los tres roles y también en el primer ingreso del Administrador. La identidad de una persona en la institución son sus dos apellidos, y quien la registra tiene su DNI delante (RF-16, RF-06b, RN-32). |
-| V35-05 | **Una Coordinación sin Responsable está parada del todo.** Sus Operadores no registran equipos, ni salidas, **ni devoluciones**: todas se rechazan explicando por qué. Su panel lo dice al entrar y sus dos botones grandes aparecen apagados, en lugar de responder con un error (RN-07, RF-35c, RF-59b, RF-77b). |
-| V35-06 | **Una ventana a la vez.** Ninguna confirmación se abre encima de otra ventana: el formulario que la pidió se aparta mientras se decide y vuelve al cerrarla. Vale para el alta de personas y para la ficha de la Coordinación (RNF-26). |
-| V35-07 | **Al entrar, el sistema saluda y dice dónde se ha entrado**: nombre de quien accede, su rol, su Coordinación y la Dirección a la que pertenece, con un único botón **Cerrar**. Una vez por ingreso, no por recarga (RF-01b). |
-| V35-08 | **El esquema se declara una sola vez.** Las seis migraciones —la inicial y las cinco que la corregían— se funden en `V1` y `V2`, que describen la base tal como es hoy. Ninguna instalación tenía datos que migrar, y leer seis archivos para saber cómo es una tabla no ayudaba a nadie (sección 5). |
-
-**Lo que no cambia.** El alta sigue partida en registro previo y asignación; la
-baja del Responsable sigue siendo un acto explícito y suyo, y sigue haciendo
-falta antes de nombrar a un sucesor; cada persona sigue perteneciendo a una
-sola Coordinación. Las dos Direcciones siguen precargadas. La matriz de
-permisos no gana ni pierde una capacidad.
-
----
-
-## 0.7 Resumen de cambios de la versión 3.4 respecto a la 3.3
-
-La versión 3.4 no toca el inventario, ni los préstamos, ni el historial del
-bien, ni la CSP. Cambia **cuántas coordinaciones lleva una persona**, **cómo
-se sustituye a un Responsable** y **cuánto se le dice al usuario antes de que
-algo ocurra**.
-
-Tres observaciones del uso real la motivan. La 3.3 admitió que un Responsable
-llevara varias Coordinaciones pensando en el coordinador a cargo de dos
-laboratorios; en la práctica, quien responde por un inventario responde por
-ese inventario, y repartir el cargo reparte también a quién hay que preguntar
-por un equipo. El relevo automático —asignar el puesto de una Coordinación
-ocupada sustituía al vigente en el mismo acto— dejaba a alguien fuera de su
-cargo como efecto colateral de nombrar a otro, sin que nadie hubiera decidido
-darlo de baja. Y la lista de personas mostraba de golpe el DNI, el correo y la
-coordinación de cada uno: siete columnas para encontrar a alguien, cuando para
-encontrarlo basta su nombre.
-
-| Id | Cambio |
-| --- | --- |
-| V34-01 | **Cada persona pertenece a una sola Coordinación.** Vale igual para el RESPONSABLE y para el OPERADOR (RN-05). Mover a alguien deja de ser sumarle un destino: se le da de baja del puesto que tiene y se le asigna después el nuevo. Con ello desaparecen el selector de ámbito del encabezado, la cabecera `X-Coordinacion` y la noción de *coordinación en curso*: el ámbito de una operación ya no es algo que el cliente elija, porque no hay entre qué elegir (RNF-10). |
-| V34-02 | **Asignar el puesto de Responsable de una Coordinación que ya lo tiene se rechaza**, nombrando a quien lo ocupa y diciendo dónde se le da de baja. En el selector, esas Coordinaciones se ven pero no se eligen (RF-19b, RN-06). |
-| V34-03 | **La baja del Responsable es un acto propio, y vive en la tarjeta de su Coordinación.** El botón **Dar baja al responsable** de la pantalla de Direcciones es lo que ocurre cuando alguien renuncia al cargo: el saliente queda como persona registrada, sin coordinación y con su cuenta activa; la tarjeta pasa a rojo y pide un sucesor (RF-26). Solo el Administrador puede hacerlo. Es también la única manera de sustituir a un Responsable: primero la baja, después el nombramiento. |
-| V34-04 | **Una Coordinación sin Responsable no registra ni presta equipos, y ahora el servidor lo impide.** Hasta la 3.3 la tarjeta lo anunciaba pero nada lo comprobaba: un bien podía quedar registrado sin responsable a su nombre. La baja del vigente ya no exige que la Coordinación esté vacía —si lo exigiera, una Coordinación con equipos no podría cambiar nunca de Responsable—; lo que hace es dejarla parada hasta que se nombre al sucesor (RN-07). |
-| V34-05 | **La lista de personas se lee para encontrar a alguien; su ficha, para saber quién es.** Cada fila ofrece **Ver detalle**, y allí viven el DNI, el correo, la coordinación, las fechas y el botón **Editar**, junto a las acciones sobre sus credenciales. La tabla queda con lo que sirve para buscar: persona, rol, usuario y estado de la cuenta (RF-28f). |
-| V34-06 | **Ninguna acción importante ocurre sin una confirmación flotante que diga qué va a pasar.** El alta y la edición de una persona terminan en una ventana con los datos tal como van a quedar, y con **Cancelar** —que cancela el registro— y **Aceptar**. Se suman las confirmaciones que faltaban: asignar un puesto, dar de baja un puesto, restablecer una contraseña, desbloquear una cuenta y activar o desactivar una Coordinación o un Laboratorio (RNF-26). |
-
-**Lo que no cambia.** El alta sigue partida en dos: registro previo primero
-(RF-16b) y asignación después, que es cuando nace la contraseña (RF-28d). Las
-dos Direcciones siguen precargadas y sin alta ni desactivación. El aislamiento
-por Coordinación, el historial del bien, la fotografía en el alta y la CSP
-estricta quedan intactos. La matriz de permisos gana una sola fila —la baja del
-Responsable, exclusiva del Administrador— y no pierde ninguna.
-
----
-
-## 0.8 Resumen de cambios de la versión 3.3 respecto a la 3.2
-
-La versión 3.3 no toca el inventario, ni los préstamos, ni el historial del
-bien, ni el aislamiento por Coordinación. Cambia **cómo entra una persona al
-sistema** y **cuántas Coordinaciones puede llevar**.
-
-Tres observaciones del uso real la motivan. Cuando llega alguien nuevo no
-siempre se sabe todavía dónde va a trabajar, y el formulario de alta obligaba
-a decidirlo el primer día: rol y Coordinación, o no había alta. La contraseña
-nacía con ese alta, para una cuenta que aún no podía hacer nada con ella. Y un
-coordinador de la casa puede estar a cargo de más de un laboratorio, cosa que
-el modelo de una sola adscripción no admitía: había que elegir cuál de sus dos
-puestos se registraba.
-
-| Id | Cambio |
-| --- | --- |
-| V33-01 | **El alta de una persona es un registro previo.** Pide quién es —nombres, apellidos, DNI, cargo, correo y nombre de usuario— y nada más: sin rol, sin Coordinación y sin contraseña utilizable. La persona existe en el sistema, aparece en la lista marcada como **Sin asignar** y todavía no puede entrar (RF-16b). El alta se cierra ahí: confirma lo ocurrido y dice que hay que asignarle una Coordinación y su rol, sin abrir esa ventana ni ningún otro paso (RF-16c). |
-| V33-02 | **La asignación de puesto es un acto aparte, y es donde nace la contraseña.** Desde la lista de personas, el botón **Asignar** da rol y —si es operativo— Coordinación. La contraseña temporal, aleatoria, se genera en ese momento y se muestra una sola vez (RF-28d). Quien ya tenía credenciales de otro puesto conserva las suyas. |
-| V33-03 | **Un RESPONSABLE puede estar a cargo de varias Coordinaciones.** Se le suman de una en una y elige en cuál trabaja desde el encabezado. Un OPERADOR sigue perteneciendo a una sola: registra el día a día de un inventario concreto y repartirlo sería repartir su atención (RN-05). La adscripción deja de ser una columna del usuario y pasa a ser la tabla de asignaciones que siempre fue: una relación, no un atributo. |
-| V33-04 | **El asistente de cambio de responsable desaparece, con su ruta y su endpoint.** Se retiran `/responsables/:id/relevo`, `POST /api/usuarios/coordinacion/{id}/responsable` y `GET /api/usuarios/por-dni/{dni}`. El relevo no se pierde: **es** lo que ocurre al asignar el puesto de Responsable de una Coordinación que ya lo tiene, en la misma transacción y con el aviso previo de a quién sustituye (RF-26, RN-08). Un asistente de tres pasos para lo que ahora es un botón obligaba a elegir la Coordinación antes de poder buscar a la persona, que es justo al revés de como se busca a la gente. |
-| V33-05 | **Crear una Coordinación ya no arrastra a otra pantalla.** La coordinación recién creada se queda a la vista como una tarjeta más de su Dirección, marcada en rojo y con su botón **Asignar responsable**, que lleva a `/personas` con la tarea planteada. Hasta la 3.2 el alta saltaba sola al asistente de relevo: encadenaba dos tareas que no siempre van juntas y sacaba al Administrador de la pantalla que acababa de cambiar, sin haberla visto cambiar (RF-11c). |
-
-**Revertido por la v3.4.** V33-03 y la segunda mitad de V33-04 ya no describen
-el sistema: cada persona vuelve a pertenecer a una sola Coordinación (V34-01) y
-asignar el puesto de un Responsable vigente dejó de relevarlo —se rechaza, y la
-sustitución pasa por la baja explícita del que está (V34-02, V34-03)—. Lo que sí
-sigue vigente de V33-04 es la desaparición del asistente y de sus tres
-endpoints: no han vuelto.
-
-**Lo que no cambió entonces.** La matriz de permisos no ganó ni perdió una capacidad: el
-Administrador sigue repartiendo todos los puestos y el Responsable sigue
-pudiendo dar de alta a los Operadores de su Coordinación —y allí el alta y la
-asignación se resuelven de un tirón, porque el puesto no está en duda. Las dos
-Direcciones siguen precargadas y sin alta ni desactivación. El aislamiento por
-Coordinación, el historial del bien y la CSP estricta quedan intactos.
-
----
-
-## 0.9 Resumen de cambios de la versión 3.2 respecto a la 3.1
-
-La versión 3.2 no toca el modelo de datos del bien, ni el aislamiento por
-Coordinación, ni el modelo de permisos: ningún rol gana ni pierde una sola
-capacidad. Lo que cambia es **dónde encuentra cada cosa el Administrador** y
-qué deja de tener que escribir a mano.
-
-Tres observaciones del uso real la motivan. Las dos Direcciones de INICTEL-UNI
-están en su reglamento y no cambian: pedir que alguien las transcriba el primer
-día es pedir una oportunidad de equivocarse en un dato que ya se sabe. El
-catálogo de categorías se echa en falta registrando un equipo, no navegando un
-menú institucional. Y las personas se buscan por su nombre, no por el rol que
-tienen: separar Responsables de Operadores obligaba a acertar la pantalla antes
-de poder buscar, y dejaba a los Administradores sin ninguna.
-
-| Id | Cambio |
-| --- | --- |
-| V32-01 | **Las dos Direcciones de la institución se precargan con el sistema.** La migración de datos base —entonces `V4`, hoy `V2` (V35-08)— registra la Dirección de Investigación y Desarrollo Tecnológico (DIDT) y la Dirección de Capacitación y Transferencia Tecnológica (DCTT) con su descripción. El Administrador entra a un sistema que ya sabe cómo se organiza la casa (RF-10, RN-30). |
-| V32-02 | **No existe el alta de Direcciones, ni en la pantalla ni en la API.** Desaparece el botón "Nueva dirección" y con él `POST /api/organizacion/direcciones`. Se conserva la corrección de sus datos —nombre, sigla y descripción— porque un nombre mal escrito hay que poder arreglarlo (RF-10). |
-| V32-03 | **Las Direcciones no se desactivan.** Se retiran el control "Mostrar desactivadas" de la pantalla, el botón "Desactivar" de cada Dirección y `PATCH /api/organizacion/direcciones/{id}/estado`. Como la pantalla ya no filtra por estado, el árbol se pide entero: las Coordinaciones desactivadas —que sí pueden desactivarse— siguen a la vista con su distintivo y su botón de activar, en lugar de desaparecer sin retorno. |
-| V32-04 | **La opción del menú "Estructura" pasa a llamarse "Direcciones"** y su ruta pasa de `/estructura` a `/direcciones`. La ruta anterior redirige a la nueva. **El catálogo de categorías sale del menú** y se administra desde el Inventario, con el botón "Gestionar categorías" (RF-31). |
-| V32-05 | **Las personas del sistema se gestionan en una sola pantalla, `/personas`, con filtro por rol.** Sustituye a las secciones separadas de Responsables y Operadores, que redirigen a ella. La lista muestra el rol de cada persona como un distintivo con color y texto, incluye a los Administradores —que antes no aparecían en ninguna lista— y el alta permite elegir cualquiera de los tres roles, como RF-16 siempre previó (RF-28). |
-
-**Lo que no cambió entonces.** El relevo de Responsable conservaba su asistente
-y su ruta `/responsables/:id/relevo`, que la v3.3 retiró (V33-04). El panel
-"Coordinaciones sin responsable" encabezaba la pantalla de personas (RF-28b);
-la v3.6 lo retiró, porque la Coordinación parada ya se anuncia en su cuadro de
-Direcciones (V36-03). El Responsable sigue viendo a su gente en "Mi equipo
-humano". Las reglas de negocio, la matriz de permisos y el aislamiento por
-Coordinación quedaron intactos.
-
----
-
-## 0.10 Resumen de cambios de la versión 3.1 respecto a la 3.0
-
-
-La versión 3.1 no toca la jerarquía organizacional, el aislamiento por
-Coordinación ni el modelo de permisos. Cambia una sola cosa, y en un solo
-punto: **cómo llega la fotografía del bien al sistema**.
-
-Hasta la 3.0 la fotografía solo podía adjuntarse después, desde la ficha del
-bien ya registrado, y siempre eligiendo un archivo del dispositivo. Quien
-inventaría no trabaja así: recorre el laboratorio con una tablet en la mano y
-tiene el equipo delante justo mientras lo registra. Obligarlo a fotografiar
-con la aplicación de cámara, guardar la imagen, terminar el alta, buscar el
-bien en el listado, abrir su ficha y recién ahí subir el archivo son seis
-pasos para lo que el dispositivo resuelve en uno.
-
-| Id | Cambio |
-| --- | --- |
-| V31-01 | **El registro de un bien termina con un paso de fotografía, opcional.** Es el último paso antes del resumen y se puede saltar sin escribir nada: un bien sin foto se registra igual que antes (RF-51b). El paso solo existe en el alta; en la edición la fotografía se sigue cambiando desde la ficha, que es donde ya vivía, para no tener dos sitios que hagan lo mismo. |
-| V31-02 | **Quien registra puede tomar la foto del equipo con la cámara del propio dispositivo**, sin salir del formulario: la aplicación abre un visor en vivo, congela la imagen y la adjunta. Es la vía pensada para la tablet. La alternativa de siempre —elegir una imagen ya guardada— se conserva íntegra y con el mismo peso visual. |
-| V31-03 | **La cámara se habilita solo para el propio origen.** La cabecera `Permissions-Policy` pasa de `camera=()` a `camera=(self)`. Ninguna otra capacidad se abre y la Content-Security-Policy no se relaja en ninguna directiva: el vídeo del visor se enlaza por código sobre el elemento, no por URL. |
-| V31-04 | **Una fotografía que falla nunca tumba un alta.** El bien se registra primero y la imagen se adjunta sobre él; si el envío de la imagen falla, el equipo queda registrado y el sistema avisa que la fotografía quedó pendiente y dónde completarla. |
-
----
-
-## 0.11 Resumen de cambios de la versión 3.0 respecto a la 2.0
-
-La versión 3.0 conserva íntegra la jerarquía organizacional y el aislamiento
-por Coordinación que introdujo la 2.0. Lo que cambia es qué se registra de las
-personas, qué le falta a una Coordinación para poder trabajar y cómo se
-presenta todo ello al Administrador.
-
-| Id | Cambio |
-| --- | --- |
-| V3-01 | **Desaparece la bitácora de acciones por Coordinación.** El sistema deja de registrar quién hizo cada cosa. Se eliminan el módulo 8 completo (RF-69 a RF-74), la ruta `/historial`, la API `/api/historial`, la tabla `auditoria` y el contexto `auditoria` del backend y del frontend. La trazabilidad **del bien** (módulo 6) se conserva intacta: es historial patrimonial, no vigilancia de personas. |
-| V3-02 | **Primer ingreso del Administrador ampliado.** Además de la contraseña, confirma su identidad real: nombres, apellidos y DNI. La cuenta inicial nace con datos de relleno y el DNI es el identificador de una persona en todo el sistema. |
-| V3-03 | **La contraseña se representa siempre con un candado.** El botón de restablecer contraseña de las listas de personas, y el cambio de contraseña propia, llevan el icono de candado en lugar del icono de reinicio. |
-| V3-04 | **Toda Coordinación nace con su primer Laboratorio**, en la misma transacción, y nunca se queda sin ninguno activo. |
-| V3-05 | **Sin laboratorios no se registran bienes.** Un bien sin un lugar donde estar no se puede encontrar después. |
-| V3-06 | **Toda Coordinación recién creada lleva directo a asignar su Responsable**, en la sección de Responsables, eligiendo a alguien que ya existe (buscado por DNI) o dándolo de alta en el mismo acto. |
-| V3-07 | **Las Coordinaciones se presentan en cuadros y no en franjas horizontales.** Cada Coordinación se lee entera de un vistazo y varias se comparan de golpe. |
-| V3-08 | **La adscripción a una sola Coordinación se hace explícita en la interfaz.** El alta de personas dice "Asignar a una coordinación" y advierte que es una y solo una; al dar de alta un Responsable no se ofrecen las Coordinaciones que ya lo tienen. |
-
----
-
-## 0.12 Resumen de cambios de la versión 2.0 respecto a la 1.0
-
-La versión 2.0 reemplazó el modelo plano de una sola área por una jerarquía
-organizacional real y un modelo de permisos multi-inquilino (multi-tenant)
-donde la COORDINACIÓN es la unidad de aislamiento.
-
-| Id | Cambio                                                                                                                                |
-| --- |---------------------------------------------------------------------------------------------------------------------------------------|
-| C-01 | Se incorpora la jerarquía Institución > Dirección > Coordinación > Laboratorio. El campo libre "area" desaparece.                     |
-| C-02 | Los roles son: ADMIN, RESPONSABLE y OPERADOR.                                                                  |
-| C-03 | El inventario deja de ser único y global: cada Coordinación posee su propio inventario, aislado de las demás.                         |
-| C-04 | El Administrador pierde toda capacidad de escritura sobre los bienes. Su rol es estructural y de supervisión, no operativo.           |
-| C-05 | Se eliminan los atributos dinámicos (modelo EAV). El bien pasa a tener un conjunto de campos fijos, ampliado con fecha de adquisición y costo. |
-| C-06 | El campo "estado" del bien se renombra a "condicion" y su valor inicial pasa de DISPONIBLE a OPERATIVO.                               |
-| C-07 | Se incorpora el historial inmutable de movimientos por bien: toda transición de condición queda registrada con su fecha y hora.       |
-| C-08 | Se incorpora el caso de uso "Cambio de Responsable" con relevo obligatorio: una Coordinación nunca puede quedar sin Responsable.      |
-| C-09 | Se incorpora la bitácora de auditoría por Coordinación (suprimida en la v3.0).                                                        |
-| C-10 | La capacidad objetivo sube de 50 a 300 usuarios concurrentes.                                                                         |
-
----
-
 ## 1. Introducción
 
 ### 1.1 Propósito
@@ -506,7 +102,6 @@ ve ni modifica los bienes de una Coordinación distinta a la suya.
 | Registro previo | Alta de una persona sin puesto: existe en el sistema con sus datos, pero sin rol, sin Coordinación y sin contraseña, de modo que todavía no puede entrar (RF-16b) |
 | Asignación | Acto que le da a una persona registrada un rol y, si es operativo, la Coordinación —una sola— donde lo ejerce; es cuando nace su contraseña (RF-28d). Solo la recibe quien no tiene ningún puesto, y nadie se la da a sí mismo (RN-33) |
 | Baja de un puesto | Acto que retira a una persona de su Coordinación y la devuelve al estado de registrada sin puesto, con su cuenta activa (RF-28d). No confundir con la **baja de la persona**, que es su salida de la institución (RF-22b) |
-| Suspensión | Ausencia temporal —vacaciones, permiso, licencia—: la persona no entra al sistema y **conserva su puesto**, porque va a volver a él (RF-22b) |
 | Baja de una persona | Salida de la institución: la persona deja de entrar y **deja su puesto**, que queda libre. Su historial se conserva y puede reincorporarse, pero vuelve sin cargo (RF-22b, RN-34) |
 | Libre | Persona con su cuenta activa y **sin puesto**: ni rol ni Coordinación. Es como queda quien acaba de registrarse, quien deja un cargo y quien es relevado (RF-16b, RF-26b) |
 | Ficha de la persona | Ventana con todos sus datos —DNI, correo, coordinación, fechas— y con las acciones que se ejercen sobre ellos, empezando por **Editar**. Se abre desde su fila en la lista (RF-28f) |
@@ -716,11 +311,12 @@ primero en él.
 | RF-19b | El selector de Coordinación de una asignación de RESPONSABLE mostrará las que ya tienen responsable junto al nombre de quien lo es, y no permitirá elegirlas: para esas, el camino es **Cambiar responsable** desde su ficha (RF-26b). No se ocultan, porque saber quién está a cargo es justamente lo que hace falta para decidirlo (RNF-26). |
 | RF-20 | Una Coordinación podrá tener cualquier número de Operadores. |
 | RF-21 | El Administrador podrá editar los datos de cualquier usuario. |
-| RF-22 | El Administrador podrá **suspender**, **dar de baja**, **reactivar** y **reincorporar** cuentas. Son las únicas formas de retirar a una persona: el sistema no ofrece eliminación física de usuarios en ninguna pantalla ni endpoint (RN-09). |
-| RF-22b | **La cuenta tiene tres estados, y la diferencia entre dos de ellos es de fondo.** **Activa**: la persona trabaja y entra. **Suspendida**: no entra *por ahora* —vacaciones, un permiso, una licencia— y **conserva su puesto**, porque va a volver a él; su Coordinación sigue teniendo Responsable si lo era. **De baja**: ya no pertenece a la institución, y por eso **deja también su puesto**: quien se fue no responde por un inventario ni figura entre los operadores de una Coordinación (RN-34). Si era el Responsable, la suya queda parada hasta que se nombre a otro (RN-07). Ningún estado borra a la persona ni su historial. |
-| RF-23 | Al **reactivar** una cuenta suspendida, la persona recupera su puesto tal como lo dejó y vuelve a operar con normalidad. Al **reincorporar** a quien estaba de baja, recupera su cuenta **pero no su puesto**: el que tenía se cubrió cuando se fue, y dárselo otra vez es una decisión aparte (RF-28d). |
+| RF-22 | El Administrador podrá **dar de baja** y **reincorporar** cuentas. Son las únicas formas de retirar a una persona: el sistema no ofrece eliminación física de usuarios en ninguna pantalla ni endpoint (RN-09). |
+| RF-22b | **La cuenta tiene dos estados.** **Activa**: la persona trabaja y entra. **De baja**: ya no pertenece a la institución, y por eso **deja también su puesto**: quien se fue no responde por un inventario ni figura entre los operadores de una Coordinación (RN-34). Si era el Responsable, la suya queda parada hasta que se nombre a otro (RN-07). Ninguno de los dos borra a la persona ni su historial. **No hay suspensión temporal** (v3.12): una ausencia con retorno —vacaciones, un permiso, una licencia— no es una decisión sobre el acceso al sistema, y sostener dos formas distintas de no entrar obligaba a cada pantalla y a cada regla a explicar cuál era cuál. |
+| RF-22c | **El sistema no ofrecerá ninguna forma de apartar temporalmente a una persona**, en ningún rol ni en ninguna pantalla. `PATCH /api/usuarios/{id}/estado` acepta únicamente `BAJA` y `ACTIVA`; cualquier otro valor se rechaza con 400. El único mecanismo que deja a alguien fuera por un rato es el **bloqueo por intentos fallidos**, que es automático, temporal y de seguridad, y no lo decide nadie (RNF-05). |
+| RF-23 | Al **reincorporar** a quien estaba de baja, recupera su cuenta **pero no su puesto**: el que tenía se cubrió cuando se fue, y dárselo otra vez es una decisión aparte (RF-28d). |
 | RF-24 | El sistema validará la unicidad del DNI, del correo y del nombre de usuario, y el formato del DNI (exactamente 8 dígitos numéricos). |
-| RF-25 | **Siempre queda al menos un Administrador activo, y nadie decide sobre su propia cuenta.** El sistema impedirá que un Administrador se suspenda o se dé de baja a sí mismo, y que el último Administrador activo quede fuera por cualquiera de las tres vías que pueden quitarlo de en medio: la suspensión, la baja y el nombramiento como Responsable de una Coordinación, que también le quita el cargo (RF-26b). Sin esta regla el sistema admite quedarse sin nadie que reparta los puestos, y la única salida sería entrar en la base de datos a mano. |
+| RF-25 | **Siempre queda al menos un Administrador activo, y nadie decide sobre su propia cuenta.** El sistema impedirá que un Administrador se dé de baja a sí mismo, y que el último Administrador activo quede fuera por cualquiera de las dos vías que pueden quitarlo de en medio: la baja y el nombramiento como Responsable de una Coordinación, que también le quita el cargo (RF-26b). Sin esta regla el sistema admite quedarse sin nadie que reparta los puestos, y la única salida sería entrar en la base de datos a mano. |
 
 **RF-26 — CAMBIO DE RESPONSABLE.** Poner a otra persona al frente del
 inventario de una Coordinación es **un solo acto**, y ocurre **en la
@@ -783,8 +379,9 @@ se nombre a alguien, porque nadie ha entrado a ocuparlo.
 | RF-28b | **La Coordinación sin Responsable se anuncia en Direcciones, no en Personas.** Su cuadro se marca en rojo y ofrece **Asignar responsable**, que lleva a la lista de personas con la tarea planteada (RF-15b). La pantalla de personas ya no encabeza su contenido con el panel *"Coordinaciones sin responsable"* que tuvo hasta la v3.5: la misma alerta en dos sitios se contradice en cuanto uno de los dos envejece, y el sitio donde se administra una Coordinación es su cuadro. Al llegar con el encargo, la pantalla queda en **modo encargo** y las filas de las personas **sin asignar** —las únicas que pueden recibir el puesto (RN-33)— ofrecen **Asignar aquí** en lugar del botón genérico. Hasta la v3.7 una barra recordaba además qué puesto se estaba cubriendo, con su botón de cancelar; se retiró con los demás recuadros (V38-02), de modo que el modo se reconoce por ese botón de las filas y se abandona saliendo de la pantalla. |
 | RF-28c | La lista mostrará el rol de cada persona como un distintivo con color **y** texto, incluido el estado **Sin asignar** de quien está registrado sin puesto (RNF-30). Un filtro de puesto acota la lista a las personas sin asignar: es la cola de trabajo del Administrador. |
 | RF-28e | La Coordinación de cada persona se muestra en su ficha (RF-28f). Un Administrador figura como "Toda la institución"; alguien sin puesto, como "Todavía ninguna". |
-| RF-28f | **Cada fila ofrece "Ver detalle", que abre la ficha de esa persona.** La tabla conserva lo que sirve para encontrarla —nombre, cargo, rol, nombre de usuario y estado de la cuenta—; el **DNI**, el **correo institucional**, la **Coordinación**, el último acceso y la fecha de registro viven en la ficha, junto a las acciones que se ejercen sobre esos datos: **Editar**, **Restablecer contraseña**, **Desbloquear** (si la cuenta lo está), **Suspender o reactivar**, **Dar de baja o reincorporar** (RF-22b) y **Asignar puesto**. La edición se abre desde ahí y no desde la fila: se corrigen los datos de alguien mirándolos, no recorriendo una tabla (RNF-22). En la fila quedan solo **Ver detalle** y **Asignar**: activar y desactivar salieron de ella en la v3.5, porque eran un segundo camino al mismo sitio. |
-| RF-29 | El Responsable visualizará en una única sección a **los Operadores** de su Coordinación, y podrá darlos de alta, editarlos, **suspenderlos y darlos de baja** —solo a ellos, y solo los de su Coordinación (RF-22b)—. La pantalla no muestra los datos del propio Responsable: quien la mira es esa misma persona, y su ficha está en *Mi cuenta*. En esa pantalla el registro y la asignación se resuelven **en un solo acto**, al contrario que en la de Personas: el puesto no está en duda —el Responsable solo puede crear Operadores, y solo en la Coordinación que administra—, así que preguntárselo sería preguntar lo que ya se sabe (RNF-22). |
+| RF-28f | **Cada fila ofrece "Ver detalle", que abre la ficha de esa persona.** La tabla conserva lo que sirve para encontrarla —nombre, cargo, rol, nombre de usuario y estado de la cuenta—; el **DNI**, el **correo institucional**, la **Coordinación**, el último acceso y la fecha de registro viven en la ficha, junto a las acciones que se ejercen sobre esos datos: **Editar**, **Restablecer contraseña**, **Desbloquear** (si la cuenta lo está), **Dar de baja o reincorporar** (RF-22b) y **Asignar puesto**. La edición se abre desde ahí y no desde la fila: se corrigen los datos de alguien mirándolos, no recorriendo una tabla (RNF-22). En la fila quedan solo **Ver detalle** y **Asignar**: activar y desactivar salieron de ella en la v3.5, porque eran un segundo camino al mismo sitio. |
+| RF-28g | **La ficha dice, antes de nada, si esta persona puede irse.** Al abrirse consulta `GET /api/usuarios/{id}/equipos-a-cargo`; si la persona lleva alguno, *Dar de baja* aparece **desactivado** y bajo sus datos se lista qué equipos son, con su código de inventario y su laboratorio, junto a la salida: que el Responsable de su Coordinación se los entregue a otro Operador o se los quede (RN-38, RF-83). Ofrecer un botón que el servidor va a rechazar es hacer trabajar al usuario para llegar a un error que ya se sabía (RNF-23, RNF-26). |
+| RF-29 | El Responsable visualizará en una única sección a **los Operadores** de su Coordinación, y podrá darlos de alta, editarlos y **darlos de baja** —solo a ellos, y solo los de su Coordinación (RF-22b)—. Cada fila muestra **cuántos equipos lleva ese Operador**, y mientras lleve alguno su baja aparece desactivada con el motivo escrito (RN-38, RF-84); la cifra lleva al inventario ya filtrado por esa persona. La pantalla no muestra los datos del propio Responsable: quien la mira es esa misma persona, y su ficha está en *Mi cuenta*. En esa pantalla el registro y la asignación se resuelven **en un solo acto**, al contrario que en la de Personas: el puesto no está en duda —el Responsable solo puede crear Operadores, y solo en la Coordinación que administra—, así que preguntárselo sería preguntar lo que ya se sabe (RNF-22). |
 | RF-30 | El Operador no tendrá acceso a ninguna pantalla ni endpoint de gestión de usuarios. |
 
 **RF-28d — ASIGNACIÓN DE UN PUESTO.** Es el segundo de los dos actos en que se
@@ -894,12 +491,31 @@ pregunta cuando hay que ir a buscarlo.
 | --- | --- |
 | RF-83b | **Todo bien nace a cargo del Responsable de su Coordinación**, lo registre quien lo registre. Que un Operador complete el formulario no lo pone a su nombre: quedárselo es una decisión aparte y la toma el Responsable (RN-37). |
 | RF-83c | **Solo el Responsable asigna y cambia el responsable de un equipo de su Coordinación.** Es quien reparte el trabajo dentro de ella y quien responde por el inventario entero. Un Operador no se asigna equipos a sí mismo ni se los pasa a un compañero, y el Administrador no reparte equipos de nadie, porque no opera sobre ninguna Coordinación (RN-22, RN-23). |
-| RF-83d | **Se entrega únicamente a un Operador activo de la misma Coordinación.** A quien está suspendido o dado de baja no se le entrega un equipo, y la ventana no lo ofrece siquiera (RNF-23). El servidor comprueba las tres condiciones —que sea Operador, que esté activo y que sea de esa Coordinación— y la base la última por su cuenta (sección 5). |
+| RF-83d | **Se entrega únicamente a un Operador activo de la misma Coordinación.** A quien está dado de baja no se le entrega un equipo, y la ventana no lo ofrece siquiera (RNF-23). El servidor comprueba las tres condiciones —que sea Operador, que esté activo y que sea de esa Coordinación— y la base la última por su cuenta (sección 5). |
 | RF-83e | **El Responsable puede quedarse el equipo con un clic.** La ventana lo llama *dejarlo a mi cargo* y es lo que en la base significa no tener asignación. No deja el equipo huérfano: responde por él quien responde por la Coordinación. Es también lo que hay que hacer antes de que un Operador con equipos a su nombre pueda dejar su puesto (RN-38). |
 | RF-83f | **Dos sueltas ocurren solas.** La **baja de un bien** lo suelta —un equipo fuera de servicio no está a cargo de nadie, y si contara ataría a su operador a un equipo que ya no existe—; y el **ascenso de un Operador a Responsable** de su propia Coordinación suelta los suyos, porque pasa a llevarlos con otro título (RF-26b, RN-35). Ninguna de las dos cambia de manos el equipo. |
 | RF-83g | **Cada cambio deja un movimiento en el historial del bien**, del tipo `RESPONSABLE`, con la frase de quién a quién. La línea de tiempo de la ficha sí lo muestra, al contrario que las ediciones: quién custodia un equipo es parte de su historia (RF-53, RF-56, RN-21). |
 | RF-83h | **La ficha del bien lo enseña y lo cambia en el mismo sitio.** El nombre de quien lo tiene aparece entre los datos del equipo, con la marca *Responsable de la coordinación* cuando no hay operador asignado, y con el botón **Cambiar** al lado si quien mira es el Responsable. Un bien dado de baja no ofrece el botón: no hay nada que repartir. |
 
+
+**RF-84 — LISTADO POR RESPONSABLE DE EQUIPO.** Desde la v3.10 cada bien tiene
+un operador que lo custodia (RF-83), pero el dato solo se podía consultar
+abriendo las fichas una por una. La pregunta que más se hace en un laboratorio
+—*¿qué tengo yo a mi cargo?*, y su reverso, *¿qué lleva cada uno?*— no tenía
+respuesta en la pantalla que la contesta. **Es una opción del listado, no otra
+pantalla**: el inventario sigue siendo uno solo y esto es una forma más de
+mirarlo, junto a la categoría, el laboratorio y la condición.
+
+| Id | Requisito |
+| --- | --- |
+| RF-84a | **El listado se podrá acotar a los equipos de una persona.** El desplegable *Responsable de equipo* ofrece a cada quien lleve equipos en la Coordinación **con el número que lleva**, de modo que el reparto se ve antes de elegir: sin el recuento, elegir un nombre es apostar a que esa persona tenga algo a su cargo (RNF-23). |
+| RF-84b | **Los del Responsable de la Coordinación son una opción más.** Son los que no están asignados a ningún Operador, que es lo que significa no tener asignación (RN-37), y aparecen los primeros y con su título escrito. Un equipo sin operador asignado no es un equipo sin responsable, y la pantalla no debe dar a entender lo contrario. |
+| RF-84c | **Cada Operador podrá ver los suyos de un clic.** *Mis equipos*, en la cabecera del listado y con su recuento. Es la pregunta que trae a un operador a esta pantalla, y merece un botón y no una opción escondida en un desplegable (RNF-22). El Administrador no la ve: no custodia equipos de ninguna Coordinación (RN-22). |
+| RF-84d | **El listado dirá de quién es cada equipo.** Nueva columna **A cargo de**, con el nombre de quien responde por él hoy —el Operador asignado o, si no lo hay, el Responsable vigente—, y la aclaración *Responsable de la coordinación* cuando es el segundo. Es la columna que convierte una lista de bienes en un reparto. |
+| RF-84e | **El reparto se consulta de una vez.** `GET /api/equipos/responsables` devuelve quién lleva equipos en la Coordinación y cuántos lleva cada uno, agrupado en la base en una sola consulta (RNF-12). Lo consumen el desplegable del listado y la pantalla de *Mi equipo*, que lo usa para decir a quién se puede dar de baja y a quién no (RN-38). |
+| RF-84f | **El Administrador debe elegir Coordinación antes de consultarlo.** El reparto de bienes es un asunto interno de cada Coordinación, y mezclarlas juntaría en una sola fila a los responsables de todas ellas (RF-49, RN-23). Cambiar de Coordinación limpia la elección de responsable: el operador de una no figura en el inventario de otra. |
+| RF-84g | **La exportación acepta el mismo filtro.** Excel, CSV y PDF salen con el mismo recorte que la pantalla: exportar el inventario entero cuando lo que se está mirando son los equipos de un operador convierte la descarga en otro documento distinto del que se pidió (RF-52). |
+| RF-84h | **Un listado por responsable vacío no se explica como una búsqueda sin resultados.** Dice que a esa persona no le han entregado ningún equipo, y que los equipos se reparten desde la ficha de cada uno; la salida no es cambiar los filtros (RNF-23, RF-83). |
 
 **RF-47 — LISTADO DE INVENTARIO.** La ventana de inventario mostrará por
 defecto **todos** los bienes de la Coordinación, sea cual sea su condición. Un
@@ -922,6 +538,7 @@ esconde nada, y las demás pestañas acotan desde ella (V39-03).
 | RF-48 | El listado permitirá además buscar por nombre, marca, modelo, número de serie, código de inventario, código patrimonial y categoría, y filtrar por Laboratorio. |
 | RF-49 | Para el Administrador, el listado exigirá además seleccionar la Coordinación cuyo inventario se desea consultar; los filtros de condición se aplican dentro de esa Coordinación. |
 | RF-50 | El listado será paginado y ordenable por columna. |
+| RF-50b | **La ficha del bien muestra una sola autoría, no tres.** Enseña quién lo tiene hoy a su cargo (RF-83h) y **no repite** ni el Responsable vigente al darlo de alta ni quién lo registró: el primero era una foto del pasado que se confundía con el responsable del equipo —dos filas casi iguales, con nombres a veces distintos, sin que la pantalla dijera cuál mandaba—, y el segundo se lee en el historial, fechado y rotulado (RF-56b). Los dos datos siguen guardados y siguen saliendo en la exportación del inventario: lo que se retira es la duplicación en pantalla, no el dato (v3.12, RNF-22). |
 | RF-51 | El sistema permitirá adjuntar opcionalmente una fotografía del bien: en el momento del registro (RF-51b) y después, desde el formulario de **Editar** (RF-51c). La ficha del bien la muestra y la amplía, pero no la cambia. |
 | RF-52 | El sistema permitirá exportar el inventario filtrado a Excel, CSV y PDF. El Administrador exporta por Coordinación; el Responsable y el Operador exportan la suya. Los tres formatos salen **en blanco y negro** y encabezados con la dependencia a la que pertenecen (RF-52b). |
 
@@ -1004,6 +621,7 @@ cambie de condición o sufra un hecho relevante. Los tipos de movimiento son:
 | RF-54 | Cada movimiento registrará: tipo, condición anterior, condición nueva, motivo u observación, usuario que lo provocó, rol de ese usuario y fecha y hora del servidor. |
 | RF-55 | Los movimientos son de solo escritura por parte del sistema. No existe endpoint ni pantalla de edición o eliminación de movimientos. Las fechas y horas de los movimientos son inmutables. |
 | RF-56 | La ficha del bien mostrará su línea de tiempo en orden cronológico inverso y con lenguaje claro, del alta al último movimiento. **Desde la v3.9 no repite en ella los préstamos ni las devoluciones**, que tienen su propia tabla en esa misma ficha y con más datos (RF-66b), **ni muestra las ediciones**: quién corrigió un modelo mal escrito no es parte de la historia del equipo, que es dónde estuvo, en qué condición y con quién. Los movimientos ocultos se siguen registrando y conservando: el historial es inmutable y completo (RF-53, RN-21); lo que cambia es qué enseña la pantalla, que hasta la v3.8 contaba dos veces la misma salida y ninguna de las dos entera (V39-04). |
+| RF-56b | **Cada hecho dice quién lo protagonizó, y el alta lo dice rotulado.** Junto a la fecha de cada movimiento va el nombre de quien actuó y su rol de entonces; en el hecho del **alta** esa línea se lee *"Registrado por: Ana Díaz (Operador)"*. El rótulo está solo ahí porque los demás hechos ya llevan su verbo en el título del hito —"Prestado", "Dado de baja"— y repetirlo sobraría, mientras que el alta es donde se consulta quién dio de alta el bien desde que ese dato salió de la ficha (v3.12). La frase la redacta el servidor, de modo que es la misma en la pantalla y en cualquier otro consumidor (RNF-29). |
 | RF-57 | El historial de un bien será visible para el Administrador, para el Responsable de su Coordinación y para los Operadores de esa Coordinación. |
 
 ### Módulo 7: Préstamos y devoluciones
@@ -1284,17 +902,20 @@ id, username (unico), nombres, primer_apellido,
 segundo_apellido (NOT NULL, RN-32),
 dni (unico, 8 digitos), cargo, correo (unico), password_hash,
 rol (ADMIN | RESPONSABLE | OPERADOR, NULL = registro previo),
-estado (ACTIVA | SUSPENDIDA | BAJA), debe_cambiar_password, intentos_fallidos,
+estado (ACTIVA | BAJA), debe_cambiar_password, intentos_fallidos,
 bloqueado_hasta, ultimo_acceso, fecha_creacion, fecha_actualizacion
 
 El usuario no tiene columna de coordinacion: la asignacion es una
 relacion, no un atributo, y vive en usuario_coordinacion.
 rol admite NULL: es la persona registrada que aun no tiene puesto
 (RF-16b, RN-31).
-estado sustituye al booleano "activo" desde la v3.7: irse de vacaciones
-y dejar la institucion no son la misma cosa, y un interruptor no sabe
-decir cual de las dos es (RF-22b, RN-34). La BAJA borra ademas la fila
-de usuario_coordinacion: quien se fue no conserva puesto.
+estado sustituye al booleano "activo" desde la v3.7 y desde la v3.12
+tiene dos valores: la persona sigue en la institucion o ya no
+(RF-22b, RN-34). Hubo un tercero, SUSPENDIDA, para las ausencias con
+retorno; se retiro en la v3.12 porque una ausencia de dias no es una
+decision sobre el acceso al sistema (V3__retiro_suspension_cuenta.sql).
+La BAJA borra ademas la fila de usuario_coordinacion: quien se fue no
+conserva puesto.
 ```
 
 ### USUARIO_COORDINACION (asignaciones)
@@ -1411,8 +1032,8 @@ Coordinaciones, solo lectura.
 | Dar de baja el puesto de un OPERADOR | SI | Operadores (suya) | NO |
 | Editar usuarios | SI | Operadores (suya) | NO |
 | Ver la ficha completa de una persona | Todas | Los suyos | NO |
-| Suspender y reactivar cuentas | SI (salvo la propia) | Operadores (suya) | NO |
 | Dar de baja y reincorporar personas | SI (salvo la propia) | Operadores (suya) | NO |
+| Ver los equipos a cargo de una persona (RN-38) | Todas | Los suyos | NO |
 | Ver la lista de personas | Todas | Los suyos | NO |
 | Registrar bienes | NO | SI (suya) | SI (suya) |
 | Editar bienes | NO | SI (suya) | NO |
@@ -1420,6 +1041,7 @@ Coordinaciones, solo lectura.
 | Cambiar condición a mantenimiento | NO | SI (suya) | NO |
 | Dar de baja / reincorporar bienes | NO | SI (suya) | NO |
 | Consultar inventario | Todas (L) | SI (suya) | SI (suya) |
+| Listar el inventario por responsable de equipo (RF-84) | Todas (L) | SI (suya) | SI (suya) |
 | Ver historial de un bien | Todas (L) | SI (suya) | SI (suya) |
 | Registrar préstamos | NO | SI (suya) | SI (suya) |
 | Registrar devoluciones | NO | SI (suya) | SI (suya) |
@@ -1447,8 +1069,8 @@ Estas reglas se implementan en el dominio y se verifican con pruebas.
 | RN-06 | Una Coordinación tiene como máximo un RESPONSABLE activo. Asignar ese puesto cuando ya está ocupado se rechaza: no se sustituye a nadie sin darle de baja antes (RF-26). |
 | RN-07 | Una Coordinación sin RESPONSABLE está **parada**: no admite ninguna operación de escritura de sus Operadores —ni altas de bienes, ni salidas, ni devoluciones—, y el servidor lo impide en todas ellas. La consulta sigue abierta. Puede quedarse sin él —es lo que ocurre cuando se le da de baja (RF-26)— y queda marcada en rojo hasta que se nombre a su sucesor. |
 | RN-08 | La sustitución de un Responsable son dos operaciones consecutivas y explícitas: la baja del vigente y el nombramiento del entrante. Ninguna operación del sistema hace las dos a la vez. |
-| RN-09 | Un usuario nunca se elimina. Se **suspende** —temporalmente, conservando su puesto—, se **da de baja** —definitivamente, liberándolo— y se reactiva o se reincorpora (RF-22b, RN-34). |
-| RN-10 | Solo la cuenta **activa** autentica. Ni la suspendida ni la de baja pueden entrar, y el sistema responde a las dos con el mismo mensaje: cuál de los dos casos es no se revela en la pantalla de acceso (RF-07). |
+| RN-09 | Un usuario nunca se elimina. Se **da de baja** —definitivamente, liberando su puesto— y se **reincorpora**, sin él (RF-22b, RN-34). No hay ninguna forma de apartar a alguien temporalmente: la suspensión se retiró en la v3.12 (RF-22c). |
+| RN-10 | Solo la cuenta **activa** autentica. La de baja no entra, y el sistema no revela en la pantalla de acceso por qué (RF-07). |
 | RN-11 | Un bien pertenece a exactamente una Coordinación, fijada en el alta a partir de la Coordinación del usuario que lo registra. |
 | RN-12 | El Laboratorio de un bien, si existe, pertenece a la misma Coordinación que el bien. |
 | RN-13 | Todo bien nace en condición OPERATIVO. |
@@ -1468,14 +1090,14 @@ Estas reglas se implementan en el dominio y se verifican con pruebas.
 | RN-27 | No existe operación, pantalla ni endpoint que asigne a una persona a dos Coordinaciones, sea cual sea su rol. Moverla es darle de baja del puesto que tiene y asignarle después el nuevo, en dos actos separados y confirmados. |
 | RN-31 | El rol y la contraseña de una persona nacen con su asignación, no con su alta. Quien está registrado sin puesto no tiene ninguna capacidad en el sistema ni credenciales con las que entrar. |
 | RN-32 | La identidad de una persona son sus nombres y sus **dos apellidos**, los tres obligatorios en toda alta, edición y primer ingreso. El dominio los exige y la base los declara NOT NULL. |
-| RN-34 | La **suspensión** conserva el puesto y la **baja** lo libera. Quien deja la institución no responde por un inventario ni figura entre los operadores de una Coordinación: la baja retira su rol y su asignación en el mismo acto, y si era el Responsable su Coordinación queda parada (RN-07). Ninguna de las dos borra a la persona ni su historial (RN-09, RNF-47). |
+| RN-34 | La **baja libera el puesto**. Quien deja la institución no responde por un inventario ni figura entre los operadores de una Coordinación: la baja retira su rol y su asignación en el mismo acto, y si era el Responsable su Coordinación queda parada (RN-07). No borra a la persona ni su historial (RN-09, RNF-47), y la reincorporación le devuelve la cuenta pero no el puesto (RF-23). |
 | RN-35 | El puesto de Responsable de una Coordinación solo lo toma quien está **activo** y **no es ya Responsable** de ninguna: una persona sin puesto, un Operador de esa misma Coordinación o un Administrador que no sea el último activo (RF-25). El relevo es un solo acto y en él el saliente **queda libre** —sin rol y sin Coordinación—, de modo que la Coordinación no pasa ni un instante sin responsable (RF-26b, RN-07). |
 | RN-33 | Un puesto solo se **asigna** (RF-28d) a quien no tiene ninguno, sea cual sea el rol que se le vaya a dar y el que ya tenga —ADMIN incluido, que no ocupa Coordinación—. Y nadie se asigna un puesto a sí mismo. Para cambiar de puesto a alguien está **Cambiar responsable** (RN-35), que es la operación que sabe qué hacer con el que deja: liberarlo en el mismo acto. |
 | RN-28 | El sistema no conserva registro de qué usuario ejecutó cada operación fuera del historial del bien, que nombra al autor de cada movimiento por exigencia patrimonial. |
 | RN-29 | La fotografía de un bien es opcional y nunca condiciona su alta: ni su ausencia, ni un permiso de cámara denegado, ni un fallo al enviar la imagen impiden registrar el bien. |
 | RN-30 | Las Direcciones de la institución son las dos de su reglamento: se precargan con el sistema y ninguna operación las crea ni las desactiva. Solo se corrigen sus datos. |
 | RN-37 | **Todo bien está a cargo de alguien, y ese alguien es de su Coordinación.** El responsable del equipo es un **Operador** de la Coordinación del bien o el **Responsable** de esa Coordinación, y nadie más. Se representa con `equipo.responsable_equipo_id`, donde `NULL` significa *lo lleva el Responsable, sea quien sea en cada momento*: por eso el bien nunca queda sin nadie que responda por él, ni siquiera mientras la Coordinación está sin Responsable (RN-07). Todo bien nace así, también el que registra un Operador —registrar un equipo no es quedárselo—, y ahí vuelve cuando se le retira a alguien o cuando se da de baja el bien, porque un equipo fuera de servicio no está a cargo de nadie. Solo el Responsable lo asigna y lo cambia (RF-83). |
-| RN-38 | **Quien tiene bienes a su cargo no deja su puesto.** Un Operador con equipos a su nombre no se puede dar de baja ni retirar de su Coordinación —y por tanto tampoco mover a otra, que es retirarlo y volverlo a asignar (RN-27)—: antes, el Responsable tiene que entregarlos a otro Operador o quedárselos. Un equipo a nombre de alguien que ya no trabaja allí es un equipo del que nadie responde, y el inventario diría lo contrario. La **suspensión** no lo exige, porque conserva el puesto y la persona vuelve a él (RN-34). La base lo sostiene por su cuenta: la fila de `usuario_coordinacion` de esa persona está referenciada por sus bienes (sección 5). |
+| RN-38 | **Quien tiene bienes a su cargo no deja su puesto.** Un Operador con equipos a su nombre no se puede dar de baja ni retirar de su Coordinación —y por tanto tampoco mover a otra, que es retirarlo y volverlo a asignar (RN-27)—: antes, el Responsable tiene que entregarlos a otro Operador **de la misma Coordinación** o quedárselos. Un equipo a nombre de alguien que ya no trabaja allí es un equipo del que nadie responde, y el inventario diría lo contrario. La regla se **avisa antes** —la ficha de la persona y la pantalla de *Mi equipo* dicen cuántos son y cuáles antes de que nadie pulse nada (RF-28g, RF-29)— y, si aun así se intenta, el mensaje del rechazo los nombra y repite la salida. La base lo sostiene por su cuenta: la fila de `usuario_coordinacion` de esa persona está referenciada por sus bienes (sección 5). |
 | RN-36 | **Emitir un documento no es registrar un hecho.** El formato de registro de uso (RF-78) genera un PDF y no escribe nada: no se guarda en ninguna tabla, no deja movimiento en el historial del bien, no crea un préstamo y **no cambia la condición del equipo**, que queda como estaba. La salida de un bien solo consta cuando se registra el préstamo (RF-59, RN-15), y el sistema lo recuerda al emitir el formato (RF-79). Es la regla que separa el trámite en papel del registro patrimonial: confundirlos dejaría equipos "prestados" en el inventario sin ningún préstamo detrás, o fuera del laboratorio sin que el inventario lo supiera. |
 
 ---
@@ -1965,47 +1587,328 @@ al acceso si no hay sesión.
 
 ---
 
-## 9. Mapa de rutas
+## 9. Arquitectura del software
 
-### 9.1 Rutas del frontend
+El sistema es un **monolito modular** organizado por contextos delimitados de
+Domain-Driven Design. Monolito porque se despliega como una sola aplicación, se
+respalda con una sola base y no exige a la institución operar una red de
+servicios; modular porque dentro de él cada contexto es autónomo y no puede
+alcanzar las entrañas de los demás (RNF-39, RNF-40).
 
-| Ruta | Descripción |
-| --- | --- |
-| `/acceso` | Inicio de sesión |
-| `/cambiar-password` | Cambio obligatorio en el primer ingreso |
-| `/panel` | Panel según rol |
-| `/direcciones` | Direcciones, coordinaciones y laboratorios (ADMIN). `/estructura` redirige aquí |
-| `/direcciones/:id` | Detalle de una coordinación (ADMIN) |
-| `/personas` | Todas las personas del sistema, con filtro por rol y por puesto (ADMIN). Aquí se registra, se consulta la ficha de cada una y se asignan los puestos. La baja del Responsable no está aquí: está en la tarjeta de su coordinación, en `/direcciones` (RF-26). `/responsables`, `/operadores` y `/responsables/:id/relevo` redirigen aquí |
-| `/personas?asignarA=:coordinacion&rol=RESPONSABLE` | La misma pantalla, en modo encargo: se llega desde una tarjeta de Direcciones (RF-28b) |
-| `/mi-equipo` | Integrantes de la coordinación (RESPONSABLE) |
-| `/inventario` | Listado de bienes |
-| `/inventario/nuevo` | Registro de un bien |
-| `/inventario/:id` | Ficha e historial del bien |
-| `/inventario/:id/editar` | Edición del bien (RESPONSABLE) |
-| `/prestamos` | Préstamos activos e historial |
-| `/prestamos/nuevo` | Registro de una salida |
-| `/categorias` | Catálogo de categorías (ADMIN). Se llega desde el Inventario |
-| `/cuenta` | Datos de la propia cuenta |
-| `/404` | Página no encontrada |
+### 9.1 Los cinco contextos
 
-### 9.2 Rutas de la API
+| Contexto | De qué responde | Agregado raíz |
+| --- | --- | --- |
+| `iam` | Identidad y acceso: quién es cada persona, qué puesto tiene, cómo entra al sistema y cómo se retira de él | `Usuario` |
+| `organizacion` | La jerarquía institucional: Direcciones, Coordinaciones y Laboratorios | `Direccion`, `Coordinacion`, `Laboratorio` |
+| `inventario` | Los bienes, su condición, quién los custodia y su historial | `Equipo`, `Categoria` |
+| `prestamos` | La salida temporal de un bien y su retorno | `Prestamo` |
+| `reportes` | Lo que se lee y se imprime: panel de control, exportaciones y el formato de registro de uso | — (solo consulta) |
 
-| Ruta | Descripción |
-| --- | --- |
-| `/api/auth/**` | Login, logout, sesión, primer ingreso y cambio de password |
-| `/api/organizacion/**` | Direcciones (lectura y edición; sin alta ni desactivación), coordinaciones y laboratorios |
-| `/api/usuarios/**` | Personas, sus puestos y sus credenciales. `POST /api/usuarios` registra; `POST /api/usuarios/con-puesto` registra y asigna en una sola transacción, que es el alta del Responsable a un Operador suyo (RF-16e); `POST /api/usuarios/{id}/asignaciones` asigna el puesto, y lo rechaza si el de Responsable ya está ocupado o si la persona ya tiene otro; `DELETE /api/usuarios/{id}/asignaciones/{coordinacionId}` da de baja ese puesto; `PATCH /api/usuarios/{id}/estado` lleva la cuenta a ACTIVA, SUSPENDIDA o BAJA (RF-22b); `GET /api/usuarios/coordinacion/{id}/candidatos-responsable` lista a quienes pueden hacerse cargo y `POST /api/usuarios/coordinacion/{id}/responsable` ejecuta el relevo entero en una transacción (RF-26b) |
-| `/api/categorias/**` | Catálogo de categorías |
-| `/api/equipos/**` | Bienes, condición, baja e historial. `PUT /api/equipos/{id}/responsable-equipo` asigna o retira el operador que tiene el bien a su cargo, y es exclusivo del Responsable (RF-83) |
-| `/api/prestamos/**` | Salidas y devoluciones |
-| `/api/reportes/**` | Panel, exportación y `POST /api/reportes/equipos/{id}/formato-uso`, que devuelve el formato de registro de uso en PDF y no guarda nada (RF-78, RN-36) |
-| `/api/archivos/**` | Fotografías de los bienes |
-| `/actuator/health` | Sonda de estado del contenedor. Pública, y la única del actuator que se expone; responde si la aplicación está en pie, sin detalle de la base ni del pool (RNF-44) |
+A ellos se suma `compartido`, que no es un contexto sino lo que los cinco tienen
+en común y no pertenece a ninguno: el tipo `Rol`, la paginación, las excepciones
+de negocio y el contrato del usuario autenticado.
+
+### 9.2 Las cuatro capas de cada contexto
+
+La misma estructura se repite en los cinco, y el orden de las dependencias es
+siempre hacia adentro: la infraestructura conoce al dominio, y el dominio no
+conoce a nadie.
+
+```
+contexto/
+    domain/          El modelo y sus reglas. Java puro: no conoce Spring, ni
+        model/       JPA, ni la web. Aqui vive lo que el sistema es.
+        repository/  Puertos de persistencia: que necesita guardar, no como.
+        service/     Puertos hacia fuera: que necesita preguntar, no a quien.
+    application/     Los casos de uso. Orquesta el dominio y decide la
+        service/     transaccion; aqui viven las reglas que necesitan mirar
+        comando/     a mas de un agregado.
+        dto/
+    infrastructure/  Las respuestas a los puertos: JPA, seguridad, ficheros,
+        persistencia/  generadores de documentos y los adaptadores hacia los
+        acl/           demas contextos.
+        ...
+    presentation/    Los controladores REST y sus peticiones y respuestas.
+        dto/
+```
+
+**Qué gana la institución con esto.** Una regla de negocio se lee en un solo
+sitio, sin desenterrarla de una consulta SQL ni de una plantilla; y cambiar de
+motor de base de datos, de sistema de ficheros o de librería de PDF toca la
+infraestructura y no el dominio (RNF-40).
+
+### 9.3 Cómo hablan los contextos entre sí
+
+Ninguno importa el agregado de otro. Quien necesita algo de fuera **declara un
+puerto en su propio dominio** —con el nombre de lo que necesita, no del sitio de
+donde viene— y un adaptador de su infraestructura lo resuelve contra el
+**servicio de host abierto** del otro contexto, que devuelve datos planos y
+nunca agregados (RNF-39).
+
+| Contexto | Puerto que declara | Adaptador que lo resuelve | Contra |
+| --- | --- | --- | --- |
+| `iam` | `BienesACargo` | `BienesACargoInventario` | `ServicioPublicoInventario` |
+| `iam` | `EstructuraOrganizacional` | `EstructuraOrganizacionalAcl` | `ServicioPublicoOrganizacion` |
+| `inventario` | `DirectorioUsuarios` | `DirectorioUsuariosIam` | `ServicioPublicoIam` |
+| `inventario` | `UbicacionesDisponibles` | `UbicacionesOrganizacion` | `ServicioPublicoOrganizacion` |
+| `organizacion` | `CensoDeBienes` | `CensoDeBienesInventario` | `ServicioPublicoInventario` |
+| `organizacion` | `CensoDePersonal` | `CensoDePersonalIam` | `ServicioPublicoIam` |
+| `prestamos` | `CatalogoBienes` | `CatalogoBienesInventario` | `ServicioPublicoInventario` |
+| `prestamos` | `DirectorioResponsables` | `DirectorioResponsablesIam` | `ServicioPublicoIam` |
+
+`reportes` es la excepción deliberada: consume directamente
+`ServicioPublicoInventario` y `ServicioPublicoOrganizacion` sin puerto propio,
+porque no tiene dominio que proteger —no decide nada, solo lee y compone
+documentos— y un puerto ahí solo añadiría una capa sin regla que custodiar.
+
+Sus propios puertos, `GeneradorReporteInventario` y `GeneradorFormatoUso`, van
+en la otra dirección: hacia la librería que produce el archivo, que es lo que
+sí conviene poder sustituir.
+
+**Qué cruza y qué no.** Por estos ocho puertos pasa lo mínimo: un nombre, un
+recuento, una comprobación. `iam` pregunta al inventario cuántos bienes tiene
+una persona a su nombre porque de eso depende si puede dejar su puesto (RN-38),
+pero no conoce el agregado `Equipo` ni su repositorio; el inventario pregunta a
+`iam` el nombre de un usuario para mostrarlo en una ficha, pero no puede
+modificar una identidad por la puerta de atrás.
+
+### 9.4 Otros puertos del dominio
+
+No todos los puertos apuntan a otro contexto. Estos apuntan a la tecnología, y
+existen para que el dominio no dependa de ella:
+
+| Contexto | Puerto | Lo resuelve |
+| --- | --- | --- |
+| `iam` | `CifradorPassword` | BCrypt (`CifradorPasswordBCrypt`) |
+| `iam` | `GeneradorPasswordTemporal`, `PoliticaPassword` | Generación y validación de contraseñas (RNF-04) |
+| `inventario` | `AlmacenFotos` | Sistema de ficheros local (`AlmacenFotosLocal`) |
+| `reportes` | `GeneradorReporteInventario` | Apache POI y OpenPDF (`GeneradorReporteInventarioArchivos`) |
+| `reportes` | `GeneradorFormatoUso` | OpenPDF (`GeneradorFormatoUsoPdf`) |
+
+### 9.5 Dónde se comprueban los permisos
+
+En dos sitios, y a propósito:
+
+1. **La anotación del controlador** (`@PreAuthorize`) es la primera barrera y
+   detiene lo que es imposible por rol: un Operador no llega al endpoint que
+   reparte los equipos.
+2. **El servicio de aplicación** vuelve a comprobarlo, porque es el único que
+   sabe a qué Coordinación pertenece el recurso. Un Responsable tiene el rol
+   necesario para editar un bien, pero no cualquiera: solo los de su
+   Coordinación (RN-23, RNF-10).
+
+La anotación nunca es la única defensa. El identificador de Coordinación jamás
+se toma del cliente en una escritura: se deduce del usuario autenticado.
+
+### 9.6 El frontend
+
+Angular con la misma división por contextos —`iam`, `organizacion`,
+`inventario`, `prestamos`, `reportes`, `compartido`— y tres capas por contexto:
+
+- `dominio/`: los modelos que describen lo que la API devuelve, y los **puertos**
+  declarados como clases abstractas, que sirven a la vez de contrato y de token
+  de inyección.
+- `aplicacion/`: las fachadas (*facade*) que las pantallas usan, y los almacenes
+  de estado con señales de Angular (`SesionStore`, `NotificacionStore`).
+- `infraestructura/`: los adaptadores HTTP que implementan los puertos, y los
+  interceptores de autenticación y de errores.
+- `presentacion/`: los componentes de cada pantalla.
+
+El módulo raíz decide qué adaptador implementa cada puerto, de modo que una
+pantalla nunca conoce una URL.
 
 ---
+## 10. Interfaces del sistema
 
-## 10. Criterios de aceptación
+### 10.1 Rutas de la aplicación
+
+Toda ruta salvo `/acceso` exige sesión. Las que además exigen un rol lo indican;
+el guardián del navegador es una comodidad de la interfaz, y la autorización
+real la impone siempre el servidor (RF-04, RNF-10).
+
+| Ruta | Rol | Pantalla |
+| --- | --- | --- |
+| `/acceso` | — | Inicio de sesión. Con sesión abierta redirige al inicio |
+| `/cambiar-password` | Sesión | Cambio obligatorio en el primer ingreso (RF-06) |
+| `/` | Sesión | Redirige al inicio que corresponde al rol: el Administrador entra a *Direcciones*, que es su primera tarea; los demás, a su panel (RNF-36) |
+| `/panel` | Sesión | Panel de control con los indicadores del rol (RF-75 .. RF-77) |
+| `/direcciones` | ADMIN | Direcciones, coordinaciones y laboratorios. El detalle de una coordinación se abre dentro de esta misma pantalla |
+| `/estructura` | ADMIN | Redirige a `/direcciones`: la pantalla se llamó así hasta la v3.2, y los enlaces guardados siguen funcionando |
+| `/personas` | ADMIN | Todas las personas del sistema, con filtro por rol, por puesto y por estado de cuenta (RF-28). Aquí se registra, se consulta la ficha de cada una y se asignan los puestos |
+| `/personas?asignarA=:coordinacionId&rol=RESPONSABLE` | ADMIN | La misma pantalla en **modo encargo**: se llega desde una tarjeta de Direcciones y la pantalla recuerda para qué coordinación se está buscando persona (RF-28b) |
+| `/responsables`, `/operadores`, `/responsables/:id/relevo` | ADMIN | Redirigen a `/personas`. Son rutas de versiones anteriores que conducen al sitio correcto en lugar de a una 404 |
+| `/mi-equipo` | RESPONSABLE | Los Operadores de su coordinación, con los equipos que lleva cada uno (RF-29, RN-38) |
+| `/cuenta` | Sesión | Datos de la propia cuenta y cambio de credenciales |
+| `/inventario` | Sesión | Listado de bienes, con sus pestañas de condición y sus filtros |
+| `/inventario?coordinacion=:id` | ADMIN | El listado con la coordinación ya elegida; se llega desde Direcciones |
+| `/inventario?responsable=:usuarioId` | Sesión | El listado acotado a los equipos de esa persona; se llega desde *Mi equipo* (RF-84) |
+| `/inventario/nuevo` | RESPONSABLE, OPERADOR | Registro de un bien, en tres pasos |
+| `/inventario/:id` | Sesión | Ficha del bien, su fotografía y su historial |
+| `/inventario/:id/editar` | RESPONSABLE | Edición del bien, fotografía incluida (RF-40, RF-51c) |
+| `/categorias` | ADMIN | Catálogo institucional de categorías. Se llega desde el Inventario |
+| `/prestamos` | Sesión | Préstamos activos e historial |
+| `/prestamos?coordinacion=:id` | ADMIN | Los préstamos de la coordinación elegida |
+| `/prestamos/nuevo` | RESPONSABLE, OPERADOR | Registro de una salida |
+| `/404` y cualquier ruta desconocida | — | Página no encontrada, dentro del armazón para conservar el menú (RNF-34) |
+
+### 10.2 Catálogo de la API
+
+Todos los endpoints cuelgan de `/api` y responden JSON. Salvo los marcados como
+públicos, exigen el encabezado `Authorization: Bearer <token>`.
+
+La columna **Rol** indica lo que exige la anotación del controlador; el servicio
+vuelve a comprobar el ámbito por Coordinación, de modo que "RESPONSABLE"
+significa siempre *el responsable de esa coordinación*, nunca cualquiera
+(RN-23).
+
+#### Autenticación — `/api/auth`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `POST /login` | Público | Inicia sesión con nombre de usuario o correo institucional y devuelve el token (RF-01, RF-02) |
+| `POST /logout` | Sesión | Cierra la sesión |
+| `GET /me` | Sesión | Datos del usuario autenticado |
+| `POST /cambiar-password` | Sesión | Cambia la propia contraseña y renueva la sesión (RF-06, RNF-05) |
+| `POST /primer-ingreso` | ADMIN | Primer ingreso de la cuenta inicial: confirma nombre y DNI y define la contraseña definitiva, en un solo acto (RF-06b) |
+| `PUT /mi-usuario` | Sesión | Cambia el propio nombre de usuario y correo institucional |
+
+#### Personas — `/api/usuarios`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /` | ADMIN, RESPONSABLE | Lista personas con búsqueda, filtros y paginación. Acepta `q`, `rol`, `coordinacionId`, `sinAsignar` y `estado` (RF-28) |
+| `GET /{id}` | ADMIN, RESPONSABLE | Ficha de una persona |
+| `GET /{id}/equipos-a-cargo` | ADMIN, RESPONSABLE | Cuántos equipos retienen a esa persona en su puesto y cuáles son. Se consulta para advertirlo antes de que la baja se rechace (RN-38, RF-28g) |
+| `GET /coordinacion/{coordinacionId}` | ADMIN, RESPONSABLE | Integrantes de una coordinación: su responsable y sus operadores (RF-29) |
+| `GET /coordinacion/{coordinacionId}/candidatos-responsable` | ADMIN | Quiénes pueden hacerse cargo de esa coordinación: sin puesto, operadores de ella o administradores (RF-26b, RN-35) |
+| `POST /` | ADMIN, RESPONSABLE | Registro previo: la persona queda con sus datos y sin puesto ni credenciales (RF-16b) |
+| `POST /con-puesto` | ADMIN, RESPONSABLE | Registra y asigna el puesto en una sola transacción. Es el alta que el Responsable hace de sus Operadores (RF-16e) |
+| `PUT /{id}` | ADMIN, RESPONSABLE | Edita los datos personales (RF-21) |
+| `POST /{id}/asignaciones` | ADMIN, RESPONSABLE | Asigna el puesto y, con él, la contraseña. Se rechaza si el de Responsable ya está ocupado o si la persona ya tiene otro (RF-28d, RN-33) |
+| `DELETE /{id}/asignaciones/{coordinacionId}` | ADMIN, RESPONSABLE | Da de baja ese puesto y devuelve a la persona a "sin asignar", con su cuenta activa (RF-26, RF-28d) |
+| `PATCH /{id}/estado` | ADMIN, RESPONSABLE | `BAJA` da de baja de la institución y libera el puesto; `ACTIVA` reincorpora, sin devolverlo. No admite ningún otro valor (RF-22b, RF-22c) |
+| `POST /coordinacion/{coordinacionId}/responsable` | ADMIN | Ejecuta el relevo entero en una transacción: el saliente queda libre y el entrante toma el puesto (RF-26b) |
+| `POST /{id}/restablecer-password` | ADMIN, RESPONSABLE | Genera una contraseña temporal y fuerza el cambio en el siguiente ingreso (RF-06) |
+| `POST /{id}/desbloquear` | ADMIN, RESPONSABLE | Libera el bloqueo temporal por intentos fallidos (RF-08) |
+
+No existe ningún endpoint que elimine físicamente a un usuario (RN-09).
+
+#### Estructura organizacional — `/api/organizacion`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /estructura` | ADMIN | Árbol institucional con el resumen de cada coordinación (RF-15) |
+| `GET /direcciones` | Sesión | Las direcciones institucionales (RF-10) |
+| `PUT /direcciones/{id}` | ADMIN | Corrige los datos de una dirección. No hay alta ni desactivación: vienen precargadas (RF-10) |
+| `GET /coordinaciones` | Sesión | Coordinaciones, opcionalmente de una dirección |
+| `GET /coordinaciones/{id}` | Sesión | Detalle de una coordinación con su resumen de bienes y personal |
+| `POST /coordinaciones` | ADMIN | Crea una coordinación **con su primer laboratorio**, en un solo acto (RF-11, RN-26) |
+| `PUT /coordinaciones/{id}` | ADMIN | Edita una coordinación |
+| `PATCH /coordinaciones/{id}/estado` | ADMIN | La activa o desactiva. Falla si tiene bienes o préstamos vivos (RF-13) |
+| `GET /coordinaciones/{coordinacionId}/laboratorios` | Sesión | Laboratorios de una coordinación |
+| `POST /laboratorios` | ADMIN | Crea un laboratorio (RF-12) |
+| `PUT /laboratorios/{id}` | ADMIN | Edita un laboratorio |
+| `PATCH /laboratorios/{id}/estado` | ADMIN | Lo activa o desactiva. Falla si tiene bienes ubicados (RF-14) |
+
+#### Inventario — `/api/equipos`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /` | Sesión | Listado paginado. Acepta `q`, `coordinacionId`, `categoriaId`, `laboratorioId`, `condicion`, `todas`, `responsableEquipoId` y `sinResponsable`, más `pagina`, `tamano`, `ordenarPor` y `descendente` (RF-47, RF-84) |
+| `GET /responsables` | Sesión | Reparto del inventario de la coordinación: quién tiene equipos a su cargo y cuántos. El Administrador debe indicar `coordinacionId` (RF-84) |
+| `GET /{id}` | Sesión | Ficha completa del bien |
+| `GET /{id}/historial` | Sesión | Línea de tiempo completa, del alta al último movimiento (RF-56) |
+| `POST /` | RESPONSABLE, OPERADOR | Registra un bien en la coordinación del usuario. Nace operativo y a cargo del Responsable vigente (RF-34 .. RF-37) |
+| `PUT /{id}` | RESPONSABLE | Edita el bien (RF-40) |
+| `PUT /{id}/responsable-equipo` | RESPONSABLE | Entrega el bien a un Operador activo de su coordinación; con el identificador nulo se lo queda el Responsable (RF-83, RN-37) |
+| `POST /{id}/mantenimiento` | RESPONSABLE | Retira el bien del servicio, con motivo (RF-41) |
+| `POST /{id}/operativo` | RESPONSABLE | Lo devuelve al servicio o cierra su revisión pendiente (RF-41) |
+| `POST /{id}/baja` | RESPONSABLE | Baja lógica con motivo. El bien no se borra (RF-42) |
+| `POST /{id}/reincorporar` | RESPONSABLE | Devuelve al inventario un bien dado de baja, con motivo (RF-43) |
+| `POST /{id}/foto` | RESPONSABLE | Adjunta o sustituye la fotografía. `multipart/form-data`, parte `archivo` (RF-51) |
+
+#### Categorías — `/api/categorias`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /` | Sesión | Catálogo, opcionalmente solo las activas |
+| `GET /{id}` | Sesión | Una categoría |
+| `POST /` | ADMIN | Crea una categoría (RF-12) |
+| `PUT /{id}` | ADMIN | La edita (RF-13) |
+| `PATCH /{id}/estado` | ADMIN | La activa o desactiva |
+
+#### Préstamos — `/api/prestamos`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /` | Sesión | Préstamos con filtros y paginación (RF-66, RF-67) |
+| `GET /vencidos` | Sesión | Activos que superaron la fecha estimada de devolución (RF-67) |
+| `GET /bien/{equipoId}` | Sesión | Historial de préstamos de un bien (RF-66) |
+| `GET /persona/{dni}` | Sesión | Historial de préstamos de una persona (RF-66) |
+| `GET /{id}` | Sesión | Un préstamo |
+| `POST /` | RESPONSABLE, OPERADOR | Registra la salida de un bien disponible (RF-59, RF-60) |
+| `POST /{id}/devolucion` | RESPONSABLE, OPERADOR | Registra la devolución con su checklist de conformidad (RF-61 .. RF-65) |
+
+#### Reportes — `/api/reportes`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /panel` | Sesión | Indicadores del panel según el rol (RF-75 .. RF-77) |
+| `GET /inventario/{formato}` | Sesión | Exporta el inventario filtrado en `xlsx`, `csv` o `pdf`. Acepta los mismos filtros que el listado, el de responsable incluido (RF-52, RF-84g) |
+| `POST /equipos/{equipoId}/formato-uso` | RESPONSABLE | Genera el formato de registro de uso en PDF. No guarda nada: es un documento, no un registro (RF-78, RN-36) |
+
+#### Archivos y estado — `/api/archivos`, `/actuator`
+
+| Método y ruta | Rol | Qué hace |
+| --- | --- | --- |
+| `GET /api/archivos/{nombre}` | Sesión | Descarga una fotografía previamente cargada |
+| `GET /actuator/health` | Público | Sonda de estado del contenedor. Es la única del actuator que se expone, y responde si la aplicación está en pie sin detallar la base ni el pool (RNF-44) |
+
+### 10.3 Forma de las respuestas de error
+
+Todo error responde con la misma forma, de modo que el cliente no tenga que
+adivinarla endpoint por endpoint:
+
+```json
+{
+  "fechaHora": "2026-09-03T11:15:24.623",
+  "estado": 409,
+  "codigo": "REGLA_NEGOCIO",
+  "mensaje": "Luis Huaman Rojas tiene 1 equipo a su cargo, ...",
+  "ruta": "/api/usuarios/3/estado",
+  "errores": { "campo": "explicación" }
+}
+```
+
+`errores` solo viaja cuando el rechazo es campo por campo, que es lo que permite
+a los formularios señalar el campo exacto en lugar de mostrar un aviso genérico
+(RNF-25). Los códigos son estables: `DATOS_INVALIDOS` (400), `CUERPO_INVALIDO`
+(400), `NO_AUTENTICADO` (401), `CAMBIO_PASSWORD_REQUERIDO` (403),
+`ACCESO_DENEGADO` (403), `RUTA_NO_ENCONTRADA` y `RECURSO_NO_ENCONTRADO` (404) y
+`REGLA_NEGOCIO` (409).
+
+**El mensaje va dirigido a la persona, no al programador.** Dice qué pasó y cuál
+es la salida —"entrégueselos a otro operador de la misma coordinación o
+quédeselos usted"—, porque quien lo lee es personal de laboratorio y no tiene a
+quién preguntar (RNF-29).
+
+### 10.4 Documentación interactiva
+
+Con `SPRINGDOC_API_DOCS_ENABLED=true` la aplicación publica su especificación
+OpenAPI y la interfaz de Swagger en `/swagger-ui.html`, donde cada endpoint se
+puede probar contra el sistema en marcha. El perfil `prod` la **fuerza apagada**
+aunque el archivo de entorno diga lo contrario: la superficie de la API no tiene
+por qué ser pública (RNF-08).
+
+Las únicas rutas que no exigen sesión son `POST /api/auth/login` y
+`GET /actuator/health`. Además, `DELETE` está denegado por configuración sobre
+`/api/usuarios/**`, `/api/equipos/**` y `/api/organizacion/**`: no existe el
+endpoint, y si algún día se escribiera por descuido seguiría sin poder
+alcanzarse (RN-09, RNF-47).
+
+---
+## 11. Criterios de aceptación
 
 ### Autorización y aislamiento
 
@@ -2052,17 +1955,18 @@ al acceso si no hay sesión.
 - Un Administrador no puede asignarse un puesto a sí mismo: el servidor lo
   rechaza y su propia fila no ofrece la acción.
 - Dada la baja del puesto, la misma persona vuelve a poder recibir uno.
-- Una cuenta **suspendida** no puede entrar y conserva su rol y su Coordinación;
-  al reactivarla, vuelve a su puesto tal como lo dejó.
 - Una persona **dada de baja** no puede entrar y queda sin rol y sin
   Coordinación en el mismo acto; su historial en equipos y préstamos se
   conserva. Al reincorporarla vuelve con su cuenta y **sin** puesto.
-- El Administrador puede suspender y dar de baja a responsables, operadores y
-  otros administradores, pero no a sí mismo, y el sistema rechaza cualquiera de
-  las dos sobre el **último Administrador activo**, igual que rechaza
-  nombrarlo responsable de una coordinación.
-- El Responsable puede suspender y dar de baja únicamente a los **Operadores**
-  de su Coordinación; sobre cualquier otro rol recibe 403.
+- **No existe ninguna forma de apartar temporalmente a alguien**: ni pantalla,
+  ni botón, ni valor de estado. `PATCH /api/usuarios/{id}/estado` con
+  `SUSPENDIDA` responde 400 en los tres roles.
+- El Administrador puede dar de baja a responsables, operadores y otros
+  administradores, pero no a sí mismo, y el sistema la rechaza sobre el
+  **último Administrador activo**, igual que rechaza nombrarlo responsable de
+  una coordinación.
+- El Responsable puede dar de baja únicamente a los **Operadores** de su
+  Coordinación; sobre cualquier otro rol recibe 403.
 - **Cambiar responsable** ofrece exactamente tres perfiles: personas sin puesto,
   operadores de esa misma Coordinación y administradores. Quien ya es
   Responsable de otra no aparece, y el servidor lo rechaza si llega por otra
@@ -2114,9 +2018,8 @@ al acceso si no hay sesión.
   `/responsables/:id/relevo` redirige a `/personas`.
 - Dar de baja el puesto de alguien lo devuelve al estado "Sin asignar" sin
   desactivar su cuenta.
-- Suspender a un Responsable no le quita el puesto: su Coordinación sigue
-  teniendo responsable y sigue operando. Darlo de baja sí se lo quita, y
-  entonces la Coordinación queda parada hasta que se nombre a otro.
+- Dar de baja a un Responsable sí le quita el puesto, y entonces la
+  Coordinación queda parada hasta que se nombre a otro.
 - No existe ningún endpoint que elimine físicamente un usuario.
 - No es posible crear una Coordinación sin indicar su primer Laboratorio.
 - Tras crear una Coordinación, el sistema permanece en la pantalla de
@@ -2175,6 +2078,49 @@ al acceso si no hay sesión.
 
 
 
+### Retiro de la suspensión y listado por responsable de equipo (v3.12)
+
+- **No queda rastro de la suspensión en ninguna pantalla**: ni en la ficha de
+  una persona, ni en la lista de Personas, ni en *Mi equipo*, ni en el filtro de
+  estado de cuenta, que ofrece solo *Activas* y *De baja*.
+- `PATCH /api/usuarios/{id}/estado` con `SUSPENDIDA` responde **400** sea quien
+  sea quien lo envíe. Con `BAJA` da de baja y con `ACTIVA` reincorpora; llamarlo
+  con `ACTIVA` sobre una cuenta que ya lo está se rechaza diciendo que no hay
+  nada que reincorporar.
+- La migración deja en `ACTIVA` a quien estuviera suspendido —conservando su
+  puesto, que es lo que la suspensión prometía— y la restricción
+  `ck_usuario_estado` pasa a admitir dos valores. La línea base `V1` no se
+  reescribe: una base ya migrada sigue pudiendo migrar (RNF-43).
+- El **bloqueo por intentos fallidos** sigue funcionando igual y sigue siendo
+  temporal: retirar la suspensión no lo toca (RNF-05).
+- El desplegable **Responsable de equipo** del listado ofrece a cada persona con
+  el número de equipos que lleva, y la primera opción es la del Responsable de
+  la coordinación, con su título escrito.
+- Elegir a una persona deja en la tabla **solo sus equipos**, y la columna
+  **A cargo de** dice de quién es cada uno. La paginación, el orden por columna
+  y las pestañas de condición siguen funcionando sobre ese recorte.
+- **Mis equipos**, en la cabecera, lleva a los del usuario en curso con su
+  recuento. El Administrador no ve el botón.
+- Desde *Mi equipo*, pulsar la cifra de un operador abre el inventario ya
+  filtrado por él.
+- El Administrador debe elegir coordinación antes de que el desplegable ofrezca
+  nada, y cambiar de coordinación limpia la elección de responsable.
+- La exportación en Excel, CSV y PDF respeta el filtro por responsable: sale el
+  mismo recorte que la pantalla enseña.
+- Un listado por responsable sin resultados dice que a esa persona no le han
+  entregado ningún equipo, y no "pruebe a limpiar los filtros".
+- La ficha del bien **no muestra** *Responsable a cargo* ni *Registrado por*.
+  Sigue mostrando el **responsable del equipo** —quien lo tiene hoy— con su
+  botón *Cambiar* cuando quien mira es el Responsable.
+- El historial del bien encabeza el hecho del alta con *"Registrado por:"*
+  seguido del nombre y el rol de quien lo registró. Ningún otro hecho lleva ese
+  rótulo: el suyo ya está en el título del hito.
+- Sin rol registrado, la autoría queda con el nombre a secas; sin autor,
+  el historial lo dice —"Usuario no disponible"— en lugar de dejar el hueco.
+- La exportación del inventario sigue trayendo las columnas *Responsable del
+  equipo*, *Fecha de registro* y *Registrado por*: retirarlas de la ficha no las
+  retira del reporte.
+
 ### Fotografía, reportes en blanco y negro y campos de importe (v3.11)
 
 - Un Operador que llame a `POST /api/equipos/{id}/foto` recibe **403**, tenga el
@@ -2221,16 +2167,22 @@ al acceso si no hay sesión.
 - El botón **Cambiar** del responsable del equipo aparece solo para el
   Responsable, y no aparece en un bien dado de baja.
 - La ventana ofrece únicamente **operadores activos de esa coordinación**. Un
-  operador suspendido o dado de baja no figura, y una petición hecha a mano con
-  su identificador —o con el de alguien de otra coordinación— se rechaza.
+  operador dado de baja no figura, y una petición hecha a mano con su
+  identificador —o con el de alguien de otra coordinación— se rechaza.
 - Un Operador que llame al endpoint recibe 403; el Administrador, también.
 - Cada cambio deja un movimiento `RESPONSABLE` en el historial del bien, y la
   línea de tiempo de la ficha lo muestra con la frase de quién a quién.
 - **Un operador con equipos a su cargo no se puede dar de baja ni retirar de su
-  coordinación**: las dos operaciones se rechazan diciendo cuántos equipos son
-  y qué hay que hacer antes. Tras reasignarlos, las dos funcionan.
-- **Suspender** a ese mismo operador sí se permite: conserva su puesto y sus
-  equipos.
+  coordinación**: las dos operaciones se rechazan diciendo cuántos equipos son,
+  **cuáles** —los tres primeros por nombre y código, y el resto contado— y qué
+  hay que hacer antes. Tras reasignarlos, las dos funcionan.
+- La ficha de esa persona ofrece *Dar de baja* **desactivado** y lista sus
+  equipos bajo los datos; la fila de *Mi equipo* muestra su recuento y su botón
+  de baja también desactivado, con el motivo en el título. Reasignado el último
+  equipo, las dos vuelven a ofrecerla sin recargar la sesión.
+- `GET /api/usuarios/{id}/equipos-a-cargo` devuelve la misma cuenta que la baja
+  usa para decidir; el Responsable lo obtiene de sus operadores y recibe 403 de
+  cualquier otro rol.
 - Dar de baja un bien lo suelta: su operador deja de tenerlo a su cargo y, si
   era el único, ya puede dejar el puesto.
 - Ascender a Responsable a un Operador que tenía equipos a su nombre funciona
@@ -2340,7 +2292,642 @@ al acceso si no hay sesión.
 
 ---
 
-## 11. Fases de implementación
+## 12. Instalación, configuración y despliegue
+
+### 12.1 Requisitos previos
+
+| Componente | Versión | Nota |
+| --- | --- | --- |
+| Java | 21 | El proyecto compila y ejecuta con hilos virtuales habilitados |
+| PostgreSQL | 17 (probado) | Es el único motor soportado: el esquema usa índices parciales, disparadores y restricciones que la aplicación da por hechos (sección 5) |
+| Node.js y Angular CLI | Los del `package.json` del frontend | Solo para construir la interfaz |
+| Maven | No hace falta instalarlo | El proyecto trae su *wrapper*: `./mvnw` en Linux y macOS, `mvnw.cmd` en Windows |
+
+### 12.2 Variables de entorno
+
+La aplicación no lleva ningún secreto en el código ni en el repositorio. Todo se
+configura por entorno, y `.env.example` es la plantilla que hay que copiar a
+`.env` y completar (RNF-45).
+
+| Variable | Por defecto | Para qué sirve |
+| --- | --- | --- |
+| `SERVER_PORT` | `8080` | Puerto de la aplicación |
+| `SERVER_TOMCAT_THREADS_MAX` | `400` | Hilos máximos del contenedor web; sostiene la concurrencia objetivo (RNF-11, RNF-15) |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/inventario` | Base de datos |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` | Usuario de la base |
+| `SPRING_DATASOURCE_PASSWORD` | — | **Secreto.** Sin valor por defecto, a propósito |
+| `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | `50` | Tamaño máximo del pool de conexiones (RNF-15) |
+| `SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE` | `10` | Conexiones en reposo |
+| `SPRING_JPA_SHOW_SQL` | `false` | Vuelca el SQL al log. Solo para diagnóstico |
+| `SPRING_THREADS_VIRTUAL_ENABLED` | `true` | Hilos virtuales de Java 21 |
+| `APP_JWT_SECRET` | — | **Secreto.** Clave de firma del token. Sin ella la aplicación no arranca |
+| `APP_JWT_EXPIRACION_MINUTOS` | `60` | Vigencia de la sesión; la autenticación es por JWT firmado (RNF-02) |
+| `APP_SEGURIDAD_MAX_INTENTOS_FALLIDOS` | `5` | Intentos antes del bloqueo temporal (RNF-05) |
+| `APP_SEGURIDAD_MINUTOS_BLOQUEO` | `15` | Cuánto dura ese bloqueo |
+| `APP_CUENTA_INICIAL_HABILITADA` | `true` | Crea la cuenta administradora inicial si la base no tiene ninguna |
+| `APP_CUENTA_INICIAL_USERNAME` | `admin` | Nombre de usuario de esa cuenta |
+| `APP_CUENTA_INICIAL_PASSWORD` | — | **Secreto.** Contraseña de estreno; el sistema exige cambiarla en el primer ingreso (RF-06b) |
+| `APP_CUENTA_INICIAL_CORREO` | `admin@inictel-uni.edu.pe` | Correo de esa cuenta |
+| `APP_CUENTA_INICIAL_DNI` | `00000000` | DNI de relleno; el primer ingreso obliga a corregirlo (RF-06b) |
+| `APP_CORS_ORIGENES_PERMITIDOS` | `http://localhost:4200` | Orígenes admitidos por CORS |
+| `APP_ARCHIVOS_DIRECTORIO` | `./uploads` | Dónde se guardan las fotografías de los bienes |
+| `SPRINGDOC_API_DOCS_ENABLED` | `true` | Publica OpenAPI y Swagger. El perfil `prod` lo apaga siempre (RNF-08) |
+
+### 12.3 Perfiles
+
+| Perfil | Para qué |
+| --- | --- |
+| *(ninguno)* | `application.yml`: los valores comunes y los que sirven para desarrollo |
+| `dev` | Ajustes de desarrollo |
+| `prod` | Endurecimiento: sin Swagger, sin volcado de SQL, con el registro reducido a lo necesario |
+
+### 12.4 Puesta en marcha
+
+**La base de datos no se crea a mano.** Basta con que exista la base vacía: al
+arrancar, Flyway aplica las migraciones en orden y deja el esquema completo.
+
+```bash
+# 1. Configurar el entorno
+cp .env.example .env          # y completar los tres secretos
+
+# 2. Crear la base vacia (una sola vez)
+createdb -h localhost -U postgres inventario
+
+# 3. Arrancar el backend; Flyway construye el esquema
+./mvnw spring-boot:run
+
+# 4. Arrancar el frontend, en otra terminal
+cd ../frontend && npm install && npm start
+```
+
+El backend queda en `http://localhost:8080` y la interfaz en
+`http://localhost:4200`, que reenvía las llamadas a `/api` según
+`proxy.conf.json`.
+
+En el primer arranque, si la base no tiene ninguna cuenta, se crea la
+administradora inicial con las credenciales del `.env`. Esa cuenta nace con
+nombre y DNI de relleno y **obliga a corregirlos y a cambiar la contraseña antes
+de poder usar el sistema** (RF-06b): mientras no lo haga, toda petición suya
+responde `403 CAMBIO_PASSWORD_REQUERIDO`.
+
+### 12.5 Migraciones de la base
+
+| Migración | Qué hace |
+| --- | --- |
+| `V1__esquema_inicial.sql` | Las nueve tablas, sus índices, sus restricciones y el disparador de inmutabilidad del historial (RN-21) |
+| `V2__datos_base.sql` | Las Direcciones institucionales y el catálogo inicial de categorías, que no se dan de alta desde ninguna pantalla (RF-10) |
+| `V3__retiro_suspension_cuenta.sql` | Lleva a `ACTIVA` a quien estuviera suspendido y deja `usuario.estado` con dos valores (v3.12) |
+
+**Una migración aplicada no se reescribe.** Flyway guarda la suma de
+comprobación de cada una, y cambiar el archivo de una que ya corrió deja la base
+sin poder migrar. Todo cambio de esquema se corrige hacia adelante, con una
+migración nueva. La única excepción admitida fue rehacer la línea base mientras
+el sistema no estaba instalado en ninguna parte (RNF-43), y ya no aplica.
+
+### 12.6 Despliegue con contenedores
+
+El `Dockerfile` construye en dos etapas —compilación con `eclipse-temurin:21-jdk`
+y ejecución con `21-jre`, ambas sobre Alpine— de modo que la imagen final no
+lleva ni Maven ni el código fuente. El contenedor:
+
+- corre con un **usuario sin privilegios** (`inventario`), no como `root`;
+- expone el puerto `8080`;
+- guarda las fotografías en `/datos/archivos`, que conviene montar como volumen
+  para que sobrevivan al reemplazo de la imagen;
+- trae su propio `HEALTHCHECK` contra `/actuator/health`, con margen de arranque
+  para que el orquestador no lo reinicie mientras Flyway está migrando.
+
+El frontend se sirve con nginx, que además reenvía `/api` al backend y emite las
+cabeceras de endurecimiento (`seguridad-cabeceras.conf`, RNF-09, RNF-44).
+
+### 12.7 Respaldo
+
+El respaldo del sistema es el respaldo de dos cosas: la **base de datos** y el
+**directorio de fotografías**. No hay estado en ningún otro sitio: la aplicación
+no guarda sesiones en memoria —el token las lleva— ni escribe fuera de esos dos
+lugares. El respaldo de la base debe ser diario, con retención mínima de treinta días (RNF-20).
+
+---
+## Anexo A. Historial de versiones
+
+Cada versión de este documento se corresponde con una versión implementada del
+sistema. El historial se guarda entero y por una razón práctica: cuando alguien
+se pregunta por qué una pantalla está resuelta de determinada manera, la
+respuesta casi siempre es que antes estaba resuelta de otra y se vio que no
+servía. Eso es lo que aquí queda escrito.
+
+**Este es el único documento vigente.** El repositorio conservó hasta la v3.12
+un `README.md.txt.bak` con la **versión 2.0** de esta misma especificación en
+texto plano. Se retiró: su contenido está íntegramente recogido aquí —su
+estructura era la de las secciones 1 a 11, y sus cambios respecto a la 1.0
+constan más abajo—, y con doce versiones de diferencia contradecía buena parte
+de lo que el sistema hace hoy. Un documento que nadie mantiene y que dice cosas
+distintas del vigente no es un respaldo: es una fuente de errores. Su texto
+sigue disponible en el historial de control de versiones.
+
+### Versión 3.12 — respecto a la 3.11
+
+La versión 3.12 no toca la jerarquía organizacional, ni los préstamos, ni el
+historial inmutable, ni los reportes que estrenó la 3.11. Cambia **cómo se
+retira a una persona del sistema** y **cómo se consulta el inventario por quien
+lo custodia**. Es la primera desde la 3.10 que **cambia el esquema de la base**,
+y lo hace en un solo sitio: la restricción de la columna `usuario.estado`.
+
+Dos observaciones la motivan. La cuenta tenía tres estados y uno de ellos
+—**suspendida**— resolvía una situación que no es del sistema: quien se va de
+vacaciones o pide un permiso vuelve, y su cuenta no necesita que nadie decida
+nada sobre ella mientras tanto. Costaba lo que cuesta siempre un estado de más:
+cada pantalla tenía que explicar la diferencia entre dos formas de no entrar,
+cada regla tenía que decidir si valía para las dos, y quien administraba
+personas tenía que elegir entre dos botones parecidos. Y el listado del
+inventario decía qué hay y dónde está, pero no **de quién es**: desde la 3.10
+cada equipo tiene un operador que lo custodia (RF-83), y el dato no se podía
+consultar más que abriendo las fichas una por una, de modo que la pregunta que
+más se hace en un laboratorio —"¿qué tengo yo a mi cargo?"— no tenía respuesta
+en la pantalla que la contesta.
+
+| Id | Cambio |
+| --- | --- |
+| V312-01 | **La suspensión temporal de cuentas desaparece, para todos los roles.** `usuario.estado` pasa de tres valores a dos —`ACTIVA` y `BAJA`—, y con ella se van los verbos *suspender* y *reactivar*: del dominio, de la API, de la pantalla de Personas y de la de Mi equipo. Lo que la institución decide sobre una cuenta es si la persona sigue aquí o ya no (RF-22b, RN-34). Una ausencia de días se resuelve donde se ha resuelto siempre —fuera del sistema— y no dejando a alguien fuera de su propia herramienta de trabajo. |
+| V312-02 | **Quedan dos operaciones y dos, con nombre propio.** `PATCH /api/usuarios/{id}/estado` sigue existiendo pero solo acepta `BAJA` —la salida de la institución, que libera el puesto— y `ACTIVA` —la reincorporación de quien vuelve, que le devuelve la cuenta pero no el puesto (RF-23)—. Enviar `SUSPENDIDA` responde 400: el valor ya no existe. Ningún usuario se elimina, que es lo que no ha cambiado nunca (RN-09). |
+| V312-03 | **La baja avisa antes de rechazarse.** RN-38 ya impedía dar de baja a quien tuviera equipos a su nombre, pero solo al intentarlo: se pulsaba el botón y llegaba el error. Nuevo `GET /api/usuarios/{id}/equipos-a-cargo`, que dice cuántos son y **cuáles**, con su código de inventario y su laboratorio. La ficha de la persona lo consulta al abrirse, desactiva *Dar de baja* y explica la salida con la lista delante; la pantalla de *Mi equipo* trae el reparto entero de la coordinación en una sola consulta y muestra en cada fila cuántos equipos lleva ese operador (RNF-23, RNF-26). |
+| V312-04 | **El mensaje del rechazo nombra los equipos.** Cuando la baja se intenta de todos modos —por la API, o porque el reparto cambió mientras la ficha estaba abierta—, el servidor ya no dice solo "tiene 3 equipos a su cargo": cita los tres primeros por nombre y código, cuenta el resto y repite cuál es la salida, que es siempre la misma y siempre del Responsable: entregárselos a otro operador de la misma coordinación o quedárselos él (RN-38, RF-83). |
+| V312-05 | **El inventario se puede listar por responsable de equipo.** Nuevo filtro `responsableEquipoId` en `GET /api/equipos`, y su complemento `sinResponsable` para los que no están asignados a ningún operador, que son los que lleva el Responsable de la coordinación (RN-37). El listado gana la columna **A cargo de**, que es la que convierte una lista de bienes en un reparto, y el desplegable *Responsable de equipo*, que ofrece a cada persona con el número de equipos que lleva. La exportación acepta el mismo filtro: el reporte descargado sale con el mismo recorte que la pantalla (RF-84, RF-52). |
+| V312-06 | **Y cada operador puede ver los suyos de un clic.** *Mis equipos*, en la cabecera del listado, con su recuento. Es la pregunta que trae a un operador a esta pantalla y merecía un botón, no una opción escondida en un desplegable. Desde *Mi equipo*, el Responsable llega al mismo listado ya filtrado por el operador cuya cifra pulsa (RF-84, RNF-22). |
+| V312-07 | **El reparto se consulta de una vez.** Nuevo `GET /api/equipos/responsables`, que devuelve quién lleva equipos en la coordinación y cuántos lleva cada uno, agrupado en la base en una sola consulta. Lo usan el desplegable del listado y la pantalla de *Mi equipo*; sin él, saber a quién se puede dar de baja obligaba a preguntar operador por operador (RNF-12). |
+| V312-08 | **El esquema se corrige hacia adelante, no reescribiendo la línea base.** `V3__retiro_suspension_cuenta.sql` lleva a `ACTIVA` a quien estuviera suspendido —que es lo que la suspensión prometía: conservar el puesto y devolverlo— y rehace `ck_usuario_estado` con los dos valores que quedan. Se hace así y no tocando `V1` porque cualquier instalación que ya la haya aplicado tiene su suma de comprobación registrada, y cambiarla dejaría la base sin poder migrar (RNF-43). |
+
+| V312-09 | **La ficha del bien deja de mostrar dos autorías que sobraban.** Salen de ella *Responsable a cargo* —el Responsable vigente cuando el bien se dio de alta— y *Registrado por*. La primera se confundía con el **responsable del equipo**, que está justo encima y es quien lo tiene hoy: dos filas casi iguales, a veces con nombres distintos, sin que la pantalla dijera cuál manda (RF-83, RF-50b). Los dos datos se siguen guardando y siguen saliendo en la exportación del inventario; lo que se retira es la duplicación en pantalla. |
+| V312-10 | **Y el historial dice "Registrado por:".** El hecho del alta rotula su autoría con esas palabras, que es donde ese dato se consulta desde que salió de la ficha. Los demás hechos no lo llevan: su verbo ya está en el título del hito, y repetirlo sobraría. La frase la redacta el servidor —`MovimientoDto.autoria`, que sustituye al `resumen` que no consumía nadie— de modo que es la misma en todas partes (RF-56b, RNF-29). |
+
+**Lo que no cambia.** El bloqueo por intentos fallidos sigue siendo lo que era
+—temporal, automático y ajeno a esto (RNF-05)—: es el único mecanismo que
+aparta a alguien por un rato, y lo hace por seguridad y no por decisión de
+nadie. La baja sigue sin borrar a la persona ni su historial (RN-09, RNF-47),
+sigue liberando el puesto (RN-34) y sigue dejando parada la coordinación de un
+Responsable que se va, hasta que se nombre a otro (RN-07). El reparto de
+equipos se sigue haciendo donde se hacía —la ficha de cada bien, y solo por el
+Responsable (RF-83)—: lo que la 3.12 añade es poder consultarlo, no otra forma
+de cambiarlo. El bien conserva `responsable_id` y `usuario_registro_id`, y los
+reportes los siguen imprimiendo: lo que la ficha deja de mostrar no es lo que el
+sistema deja de saber.
+
+---
+
+### Versión 3.11 — respecto a la 3.10
+
+La versión 3.11 no toca el esquema de la base, ni los préstamos, ni el
+historial, ni el responsable del equipo que estrenó la 3.10. Cambia **quién
+puede poner la fotografía de un bien y desde dónde**, **cómo se ven los
+reportes impresos** y corrige un fallo de estilo que la propia 3.10 había
+introducido.
+
+Tres observaciones la motivan. La fotografía era la única escritura que un
+Operador podía hacer sobre un equipo **ya registrado**: se subía desde la ficha,
+suelta y sin confirmar nada, mientras que todos los demás datos del bien —hasta
+el más pequeño— pasan por *Editar* y por su revisión. Los reportes salían en
+azul corporativo con cabeceras de fondo oscuro y filas alternas grisáceas, y se
+imprimen en impresoras comunes para archivarse en papel, donde el color no
+aporta jerarquía y sí gasta tóner; y además no decían de quién eran: un listado
+de bienes sin la institución ni la Dirección no se le puede presentar a nadie. Y
+el símbolo **S/** del campo *Costo en soles* se había montado encima del importe.
+
+| Id | Cambio |
+| --- | --- |
+| V311-01 | **La fotografía de un equipo registrado la pone solo el Responsable.** `POST /api/equipos/{id}/foto` pasa de admitir `RESPONSABLE` y `OPERADOR` a admitir solo al primero, y el servicio comprueba lo mismo con el guardián que ya usaban editar, mantenimiento y baja. Era la última rendija: sobre un bien ya inventariado el Operador no escribe nada (RF-45), y una fotografía es un dato del bien como el modelo o el laboratorio (RF-51c). |
+| V311-02 | **La fotografía se cambia desde *Editar*, con el resto de los datos.** Deja de subirse desde la ficha —donde iba suelta, se guardaba al elegir el archivo y no pasaba por ninguna revisión— y pasa a ser una sección del formulario de edición, con la cámara del dispositivo o un archivo, y se confirma junto a todo lo demás en el paso de resumen (RF-51c, RNF-26). La ficha la sigue enseñando y ampliando, y dice dónde se cambia. |
+| V311-03 | **En el alta, la fotografía la ofrece el formulario solo a quien puede ponerla.** El Operador registra el equipo sin ella y el Responsable la adjunta después desde *Editar*. El rótulo del paso cambia con el rol —"Adquisición, ubicación y fotografía" o "Adquisición y ubicación"—, porque anunciar un paso con algo que no va a aparecer es prometer lo que no se cumple (RNF-23). |
+| V311-04 | **Los tres reportes del inventario salen en blanco y negro.** Excel, CSV y PDF pierden el azul de marca, el fondo oscuro de las cabeceras y el sombreado alterno de las filas. La jerarquía la marcan ahora el tamaño, la negrita y las líneas: en Excel la cabecera lleva borde y línea inferior gruesa; en el PDF, cada celda su recuadro. Se imprimen para archivarse, y un reporte que depende del color no sobrevive a una impresora en blanco y negro (RF-52). |
+| V311-05 | **El formato de registro de salida también.** Sus bandas de sección, que iban en azul con texto blanco, pasan a texto negro con una línea inferior gruesa; las etiquetas pierden su fondo gris y las líneas pasan a negro. Es un papel que se imprime cada vez que sale un equipo, se firma a mano y se archiva (RF-78). |
+| V311-06 | **Los reportes dicen de quién son.** Encabezan con **Sede Central INICTEL-UNI**, con el nombre completo de la **Dirección** y con el de la **Coordinación** —las tres cosas, en ese orden—, seguidas de qué es el documento y de cuándo se generó. Cuando el Administrador exporta la institución entera, la línea lo dice con esas palabras en lugar de dejar el hueco vacío. El formato de registro de salida gana también la línea de la Dirección, que es la que le faltaba para identificar la dependencia del equipo que sale (RF-52b). |
+| V311-07 | **El símbolo S/ vuelve a su sitio.** La v3.10 reescribió la regla de estilo de los campos como `input:not(...):not(...)`, y eso, además de cubrir los tipos que faltaban, **multiplicó su especificidad**: la regla base pasó a ganarle a todas las que la matizan y las anuló en silencio. El importe perdió su sangría izquierda y se montó bajo el "S/"; el campo inválido perdió su borde rojo y el foco su anillo, aunque nadie había llegado a verlo todavía. La exclusión se envuelve en `:where()`, que no suma especificidad, de modo que la regla pesa lo mínimo y cada matiz vuelve a ganarle (RNF-22). |
+
+**Lo que no cambia.** El esquema de la base queda exactamente como lo dejó la
+v3.10: ni una columna. La fotografía sigue siendo opcional y sigue sin
+condicionar el alta (RN-29); el visor a tamaño completo de la ficha, con su
+cierre por teclado, queda intacto (RNF-32). Los datos de los reportes son los
+mismos y en el mismo orden: lo que cambia es cómo se ven y qué dicen de sí
+mismos.
+
+---
+
+### Versión 3.10 — respecto a la 3.9
+
+La versión 3.10 no toca la jerarquía organizacional, ni los préstamos, ni el
+historial inmutable, ni el formato de registro de uso, ni la CSP. Es la
+primera desde la 3.7 que **cambia el esquema de la base**, y lo hace en la
+tabla del bien: una columna se sustituye y otra se añade. La base sigue vacía,
+de modo que la línea base se rehace en lugar de parchearse, como permite
+RNF-43 mientras el sistema no esté instalado (sección 5).
+
+Tres observaciones la motivan. El formato de registro de uso pide la **fecha
+de adquisición** —la de la orden de compra— y el sistema solo guardaba el
+año: el documento salía con "2024" donde debía decir "18/11/2024", y guardar
+menos de lo que el documento necesita obliga a rellenarlo a mano con un dato
+que el sistema ya debería conocer. El inventario decía a nombre de quién
+estaba cada equipo —del Responsable, todos— pero no **quién lo tiene**, que es
+la pregunta que se hace cuando hay que ir a buscar uno; y en un laboratorio
+los equipos los custodian los operadores, cada uno los suyos. Y los campos de
+teléfono y de hora salían con otra altura, otro borde y otro ancho que los de
+al lado, porque la hoja de estilos enumeraba los tipos de campo uno a uno y a
+esos dos no los nombraba.
+
+| Id | Cambio |
+| --- | --- |
+| V310-01 | **El bien guarda la fecha de adquisición, no el año.** `equipo.anio_adquisicion INTEGER` pasa a ser `equipo.fecha_adquisicion DATE`, y con ella el formato de registro de uso imprime la fecha de la orden de compra tal como el papel la pide (RF-78). El formulario de alta cambia el campo numérico por un calendario acotado entre el 1 de enero de 1980 y hoy; el listado ordena por ella y la muestra en `dd/MM/yyyy`. La regla no cambia de fondo: la adquisición sigue sin poder ser futura (RN-25), solo que ahora se comprueba al día y no al año. |
+| V310-02 | **Cada equipo tiene un responsable de equipo, y es un Operador.** Nueva columna `equipo.responsable_equipo_id`. Responde a "quién lo tiene", que no es lo mismo que "quién responde por el inventario": el segundo es el Responsable de la Coordinación y ya estaba (RF-36); el primero es la persona que lo custodia día a día (RF-83). **`NULL` no es un hueco**: significa que lo lleva el Responsable, sea quien sea en cada momento. Así nace todo bien —también el que registra un Operador, que registrarlo no es quedárselo— y ahí vuelve cuando se le retira a alguien (RN-37). |
+| V310-03 | **Solo el Responsable reparte los equipos de su Coordinación.** `PUT /api/equipos/{id}/responsable-equipo` es suyo y de nadie más: es quien reparte el trabajo y quien responde por el inventario entero. Un Operador no se asigna equipos a sí mismo ni se los pasa a un compañero. Se entrega únicamente a un **Operador activo de la misma Coordinación** —a un suspendido o a un dado de baja no se le entrega nada— y el propio Responsable puede quedárselo con un clic, que es lo que la pantalla llama *dejarlo a mi cargo* (RF-83, RN-37). |
+| V310-04 | **Quien tiene equipos a su cargo no deja su puesto.** Un Operador con bienes a su nombre no se puede dar de baja ni retirar de su Coordinación —y por tanto tampoco mover a otra, que es retirarlo y volverlo a asignar—: antes, el Responsable tiene que entregarlos a otro Operador o quedárselos. El mensaje dice cuántos son y cuál es la salida. La **suspensión sí se permite**: conserva el puesto y la persona vuelve a él, así que sus equipos siguen siendo suyos (RN-38, RF-22b). |
+| V310-05 | **La regla la sostiene también la base.** `equipo.responsable_equipo_id` no apunta al usuario sino a su **asignación**: la llave foránea es `(responsable_equipo_id, coordinacion_id) → usuario_coordinacion (usuario_id, coordinacion_id)`. Con eso la base garantiza por sí misma las dos mitades de la regla —no se puede poner a cargo a alguien de otra Coordinación, y no se puede borrar la asignación de quien tiene bienes a su nombre— igual que ya hacía con el laboratorio del bien (RN-12) y con el responsable único de cada Coordinación (RN-06). Se declara aplazable porque cambiar el rol de una persona reescribe su fila dentro de la misma transacción (sección 5). |
+| V310-06 | **Dos sueltas automáticas, y solo dos.** La **baja de un bien** lo suelta: un equipo fuera de servicio no está a cargo de nadie, y si contara ataría a su operador a un equipo que ya no existe. Y el **ascenso de un Operador a Responsable** de su propia Coordinación (RF-26b) suelta los suyos: los sigue llevando la misma persona, pero pasa a llevarlos como Responsable, que es justamente lo que significa un bien sin asignación. Las dos quedan registradas en el historial del bien. |
+| V310-07 | **El cambio de responsable deja rastro.** Nuevo tipo de movimiento `RESPONSABLE` en el historial inmutable del bien, con la frase de quién a quién. La línea de tiempo de la ficha sí lo muestra —al contrario que las ediciones, retiradas en la v3.9—: quién custodia un equipo es parte de su historia, y en un inventario patrimonial es de las cosas que hay que poder reconstruir (RF-53, RN-21). |
+| V310-08 | **Todo campo de escritura se ve igual, sea del tipo que sea.** La regla de estilo enumeraba los tipos uno a uno —`text`, `password`, `email`, `number`, `date`, `search`— y bastaba usar uno que no estuviera en la lista para que el campo saliera con el aspecto por defecto del navegador: otra altura, otro borde, otra tipografía y sin ocupar el ancho de su columna. Le pasaba a **Teléfono de contacto**, **Celular** y **Hora** del formato de registro de uso, que son `tel` y `time`. Enumerar no escala: cada campo nuevo de un tipo distinto nacía descolocado. La regla se invierte —todos menos los que no son cajas de texto— y el problema no puede repetirse. Fecha y hora reciben además la normalización que WebKit necesita para no quedar más bajos que sus vecinos (RNF-22). |
+
+**Lo que no cambia.** El bien sigue perteneciendo a una sola Coordinación y no
+sale de ella (RN-11); `equipo.responsable_id` sigue siendo lo que era, el
+Responsable vigente **al dar de alta** el bien (RF-36), y en la ficha se rotula
+así para no confundirlo con el nuevo. El préstamo no se toca: prestar un
+equipo no cambia quién lo tiene a su cargo, porque la salida es temporal y la
+custodia no. El formato de registro de uso sigue sin guardarse (RN-36) y la
+CSP sigue sin `'unsafe-inline'` ni `'unsafe-eval'`.
+
+---
+
+### Versión 3.9 — respecto a la 3.8
+
+La versión 3.9 no toca la jerarquía organizacional, ni el modelo del bien, ni
+el préstamo, ni el historial inmutable, ni la matriz de permisos, ni una sola
+regla de negocio de las que ya estaban. El esquema de la base **no cambia**:
+ni una columna, ni una tabla, ni una migración nueva. Cambia **cómo se da de
+alta a un operador**, **por dónde abren los dos listados**, **qué se ve y qué
+no se ve en la ficha de un equipo** y añade **un documento que el laboratorio
+imprime y firma**.
+
+Cuatro observaciones del uso real la motivan. El Responsable que registraba a
+un operador acertaba casi siempre, y cuando no acertaba se quedaba sin salida:
+el alta eran dos peticiones encadenadas desde el navegador y, si la segunda
+fallaba, la persona quedaba registrada **sin puesto**, invisible en su
+pantalla y con el DNI ya ocupado, de modo que no podía ni corregirla ni
+repetirla. El inventario y los préstamos abrían por una vista parcial
+—"Operativos", "Activos"— sin decirlo, así que quien no encontraba un equipo
+concluía que no estaba registrado cuando lo único que pasaba es que estaba
+prestado. La ficha del bien contaba dos veces la misma salida, en la tabla de
+préstamos y en la línea de tiempo, y ninguna de las dos veces enseñaba lo que
+de verdad se consulta: qué se dijo al entregarlo y qué se dijo al recibirlo. Y
+el laboratorio seguía rellenando a mano, en un documento aparte, un formato de
+uso cuyos datos de equipo ya estaban en el sistema.
+
+| Id | Cambio |
+| --- | --- |
+| V39-01 | **El alta de un operador es un solo acto también para el servidor.** `POST /api/usuarios/con-puesto` registra a la persona y le da su puesto **en una transacción**: o queda el operador entero, con su contraseña, o no queda nada. Hasta la v3.8 el cliente encadenaba `POST /api/usuarios` y `POST /api/usuarios/{id}/asignaciones`, y las dos podían fallar por separado. Cuando fallaba la segunda —la coordinación desactivada, un corte de red, la sesión caducada entre una y otra— la persona quedaba registrada sin rol y sin coordinación, y el Responsable **no podía verla** (su lista está acotada a su Coordinación, y quien no tiene ninguna no aparece en ella), **no podía editarla** (solo gestiona a los operadores de la suya, y aquello no era operador de nadie) y **no podía volver a registrarla**, porque su DNI, su correo y su usuario ya estaban tomados. El alta se convertía en un callejón sin salida que solo el Administrador podía deshacer (RF-16e, RNF-17b). |
+| V39-02 | **El error del alta se señala en el campo que hay que corregir.** El formulario del Responsable entrega los datos y es la pantalla de fuera quien los envía, así que la respuesta del servidor llegaba a otro sitio: un DNI repetido se anunciaba en un aviso flotante genérico —"No se pudo registrar al operador"— y ninguno de los siete campos quedaba marcado. Ahora los errores por campo vuelven al formulario, que sigue abierto con lo escrito (RNF-25). La ventana de confirmación dice además, antes de aceptar, qué va a pasar además de guardar los datos: que la persona queda como operador de esta coordinación y que el sistema va a generar su contraseña (RNF-26). |
+| V39-03 | **"Todos" es la primera pestaña y la que viene activa, en inventario y en préstamos.** La pantalla empieza enseñando todo lo que hay y el usuario acota desde ahí; el resto de pestañas conserva su orden. Abrir por "Operativos" respondía a "qué tengo disponible", que es una buena pregunta pero no es la que trae aquí: quien busca un equipo concreto y no lo encuentra no concluye que está prestado, concluye que no está registrado. Lo mismo en préstamos con "Activos", que escondía justamente el histórico que se viene a consultar (RF-47, RF-67). |
+| V39-04 | **La ficha del bien deja de contar dos veces la misma salida.** La línea de tiempo del equipo ya no repite los préstamos ni las devoluciones —tienen su propia tabla, en esa misma ficha y con más datos— ni muestra las **ediciones**: quién corrigió un modelo mal escrito no es parte de la historia del equipo, que es dónde estuvo, en qué condición y con quién. El movimiento se sigue registrando en el historial inmutable, que no se toca (RN-21, RF-56): lo que cambia es qué enseña la pantalla. |
+| V39-05 | **Cada préstamo de la ficha se abre.** Un botón **Ver detalle** por fila muestra lo que no cabía en ella y es justamente lo que se consulta cuando algo no cuadra: **quién entregó el equipo y a quién**, las **observaciones de entrega**, y del otro lado **quién recibió la devolución**, en qué estado volvió y las **observaciones de retorno**. Esas dos observaciones son la única constancia de cómo salió y cómo volvió el bien (RN-18) y hasta la v3.8 no se veían en ninguna pantalla de la ficha (RF-66b). |
+| V39-06 | **El Responsable puede emitir el formato de registro de uso de un equipo, en PDF.** Es el papel que el laboratorio hace firmar cuando un equipo sale a trabajar, con sus diez puntos y en su orden. El sistema rellena lo que ya sabe —descripción, código patrimonial, código de inventario, marca, modelo, número de serie, valor de compra, año de adquisición, área y **la condición en que el bien está ahora mismo**— y deja en blanco lo que solo saben las personas. El documento **se ve entero antes de descargarse**: un papel que se va a firmar no se descarga a ciegas (RF-78, RF-79). |
+| V39-07 | **El formato genera un documento y nada más.** No se guarda en ninguna tabla, no deja movimiento en el historial del bien, no crea un préstamo y **no cambia la condición del equipo**: después de emitirlo el bien sigue Operativo, si lo estaba. Es deliberado y es una regla nueva del sistema (RN-36). Por eso la pantalla lo recuerda dos veces —al enseñar el documento y al descargarlo— y el propio PDF lo lleva impreso al pie: el papel firmado y el registro del préstamo son dos cosas distintas, y hay que hacer las dos (RF-59, RF-79). |
+| V39-08 | **La CSP gana una directiva y no pierde ninguna.** `frame-src 'self' blob:`, que es lo que permite mostrar en un marco el PDF que el servidor acaba de devolver. Ni `script-src` ni `style-src` admiten nada nuevo, sigue sin haber `'unsafe-inline'` ni `'unsafe-eval'` en ninguna directiva, y `object-src` sigue en `'none'`. La prueba de regresión comprueba ahora también esta directiva (RNF-07, csp.spec.ts). |
+
+**Lo que no cambia.** El alta en dos actos del Administrador sigue siendo dos
+actos, porque en su pantalla el puesto es justamente lo que está por decidir
+(RF-16b, RF-28d): el acto único es del Responsable, que solo puede crear
+operadores y solo en su Coordinación. El préstamo se registra como siempre y
+con la misma pantalla (RF-59). El historial del bien conserva todos sus
+movimientos, incluidos los que la ficha ya no muestra. Y el esquema de la base
+queda exactamente como estaba: la v3.9 no ha exigido ninguna migración.
+
+---
+
+### Versión 3.8 — respecto a la 3.7
+
+La versión 3.8 no toca la jerarquía organizacional, ni el modelo del bien, ni
+los préstamos, ni el historial, ni los estados de cuenta, ni una sola regla de
+negocio. Ningún rol gana ni pierde una capacidad y el esquema de la base no
+cambia. Cambia **cómo se lee la interfaz**, **cuánto texto la acompaña**,
+**cuántas pantallas cuesta registrar un equipo** y, por fin, **cómo se
+instala**.
+
+Cuatro observaciones la motivan. La aplicación entera estaba escrita sin
+tildes —"Contrasena", "Gestion", "Coordinacion"— salvo unas pocas etiquetas
+sueltas que sí las llevaban, que es peor que no llevarlas ninguna: para una
+institución peruana esa es la primera cosa que resta seriedad, antes que
+cualquier decisión de color o de espaciado. Cada pantalla se explicaba a sí
+misma con recuadros de prosa que repetían lo que ya se veía, hasta el punto de
+que un formulario de cuatro campos llevaba tres párrafos alrededor. Registrar
+un equipo pedía seis pantallas para once datos, la mitad de ellas con dos
+campos. Y el sistema, pese a que RNF-44 lo exigía desde la 2.0, no tenía
+Dockerfile ni forma de desplegarse.
+
+| Id | Cambio |
+| --- | --- |
+| V38-01 | **La interfaz se escribe en español correcto.** Tildes y eñes en todo el texto que lee el usuario: las plantillas, las cadenas de los componentes y los datos que el sistema trae puestos —las dos Direcciones y las ocho categorías de `V2`—. No se tocó ningún identificador: `equipo.condicion` sigue llamándose así, y lo que cambió es la cabecera que lo rotula, `CONDICIÓN`. Quedan fuera a propósito las palabras que cambian de significado con la tilde (*esta/está*, *si/sí*, *que/qué*), porque acertar en el 95% y estropear el 5% es peor que no tocar (RNF-21, RNF-29). |
+| V38-02 | **Desaparecen los recuadros de aviso.** Los 36 bloques de prosa explicativa que encabezaban listados y formularios se retiran, y con ellos la costumbre de contar en un párrafo lo que la pantalla ya enseña. Sobreviven dos: los que muestran el error que devuelve el servidor, sin los cuales un rechazo de credenciales no se vería en ninguna parte. La validación junto al campo, los estados vacíos explicativos y las ventanas de confirmación quedan intactos (RNF-24, RNF-25, RNF-26). |
+| V38-03 | **Registrar un equipo son tres pantallas, no seis.** *Identificación y códigos* juntos —son la misma pregunta, cuál es este equipo, y se responden con el aparato delante y su etiqueta a la vista—; *adquisición, ubicación y fotografía* juntos —tres grupos cortos que no llenan una pantalla—; y el *resumen*, solo (RNF-28, ERS 8.4). |
+| V38-04 | **Las barras de los dos paneles vuelven a decir algo.** Llevaban vacías desde que existen: el relleno es un `<span>` dentro de un contenedor que no es flex, de modo que quedaba en flujo *inline*, y un elemento inline ignora la anchura. El navegador recibía `width: 33%` y lo pintaba a 0 px. Una línea de CSS (RF-76). |
+| V38-05 | **La acción principal deja de moverse.** Una descripción larga la empujaba al renglón siguiente y aparecía abajo a la izquierda, que es donde ya nadie la busca; ocurría en Personas y entre una Dirección y la otra. Las descripciones se limitan además a la medida de lectura (RNF-27). |
+| V38-06 | **La tabla del inventario se lee.** Los códigos dejan de partirse a mitad —"INV-2024-" en una línea y "0102" en la siguiente no es un código—, la fila baja de 150 a 92 px y la columna de acciones queda fijada al borde derecho, de modo que sus botones no se van fuera de la pantalla (RF-47, RNF-22). |
+| V38-07 | **El sistema se despliega.** Dos imágenes en dos etapas, `docker compose`, nginx sirviendo la aplicación y reenviando `/api` al backend, y toda la configuración por variables de entorno. Nginx emite además las cabeceras de endurecimiento, porque Spring solo las pone en lo que él sirve —la API— y quien entrega el HTML es nginx (RNF-07, RNF-09, RNF-44, RNF-45). |
+
+**Lo que no cambia.** Ni una regla de negocio, ni un endpoint, ni una columna.
+Las 40 comprobaciones de las reglas documentadas se ejecutaron contra la imagen
+de producción y todas se cumplen. La CSP sigue sin `'unsafe-inline'` ni
+`'unsafe-eval'` en ninguna directiva, y su prueba de regresión sigue en verde.
+
+---
+
+### Versión 3.7 — respecto a la 3.6
+
+La versión 3.7 no toca la jerarquía organizacional, ni el modelo del bien, ni
+los préstamos, ni el historial, ni la CSP. Cambia **qué le puede pasar a la
+cuenta de una persona** y **cómo se cambia de puesto dentro de la
+institución**.
+
+Dos observaciones del uso real la motivan. La cuenta tenía un solo interruptor
+—activa o no—, y con él se resolvían dos cosas que no son la misma: quien se va
+de vacaciones y quien se va de la institución acababan en el mismo sitio, de
+modo que mirando la lista no había forma de saber a cuál de los dos se esperaba
+de vuelta, ni si su puesto seguía siendo suyo. Y cambiar a alguien de puesto
+—ascender a un operador, traer a alguien de otra coordinación, relevar a un
+responsable— exigía dos actos separados con la coordinación **parada** entre
+uno y otro: la baja del que estaba y, cuando se decidiera, el nombramiento del
+que entraba. Entre los dos, sus operadores no podían registrar ni un equipo
+(RN-07).
+
+| Id | Cambio |
+| --- | --- |
+| V37-01 | **La cuenta tiene tres estados, y dos de ellos son los que faltaban.** **Suspender** es temporal —vacaciones, un permiso, una licencia—: la persona no entra por ahora y **conserva su puesto**, porque va a volver a él. **Dar de baja** es la salida de la institución: la persona deja de entrar y **deja también su puesto**, porque quien ya no trabaja aquí no responde por un inventario ni figura entre los operadores de una Coordinación. Ninguno de los dos la borra: su nombre sigue en el historial de los equipos y préstamos que pasaron por sus manos (RF-22b, RN-34, RN-09). Se puede **reincorporar** a quien volvió, y vuelve como quien acaba de registrarse: con su cuenta y sin cargo. |
+| V37-02 | **El Administrador ejerce las dos sobre cualquiera** —responsables, operadores y otros administradores—, con dos límites que el servidor impone: no sobre sí mismo, y **nunca sobre el último Administrador activo**, ni suspendiéndolo ni dándolo de baja ni nombrándolo responsable de una Coordinación. Sin esa regla el sistema admite quedarse sin nadie que pueda repartir puestos (RF-25). El **Responsable** las ejerce sobre los **Operadores de su Coordinación**, y solo sobre ellos (RF-29). |
+| V37-03 | **Cambiar de puesto se hace en la Coordinación, con "Cambiar responsable", y es un solo acto.** Allí se elige entre quienes pueden tomarlo: una persona **sin puesto**, un **Operador de esa misma Coordinación** —que asciende sin cambiar de sitio— o un **Administrador** que baja al terreno. Nunca quien ya es Responsable de otra: nadie responde por dos inventarios a la vez (RF-26b, RN-35). El **saliente queda libre en la misma transacción**: sin rol y sin Coordinación, con su cuenta activa y su historial intacto. La Coordinación no pasa ni un instante sin responsable, que es lo que la partición en dos actos no podía evitar (RN-07). |
+| V37-04 | **La misma ventana nombra al primer responsable.** Una Coordinación recién creada ya no manda a otra pantalla a buscar a la persona: se elige aquí, entre los mismos candidatos, con la Coordinación delante. La ruta con encargo de `/personas` sigue funcionando para quien la tenga guardada, pero ninguna pantalla la genera (RF-26b, RF-28b). |
+| V37-05 | **El esquema declara el estado en lugar del interruptor.** `usuario.activo` desaparece y en su lugar está `usuario.estado` —`ACTIVA`, `SUSPENDIDA`, `BAJA`— con su restricción. La base no tenía datos, así que la línea base se rehace en lugar de parchearse, como permite RNF-43 mientras el sistema no esté instalado. |
+
+**Lo que no cambia.** El alta sigue partida en registro previo y asignación
+(RF-16b, RF-28d), y la asignación sigue dándose solo a quien no tiene puesto
+(RN-33): "Cambiar responsable" no es una excepción a esa regla sino la
+operación que sí sabe qué hacer con el puesto que la persona deja. El
+aislamiento por Coordinación, el historial del bien, la fotografía en el alta y
+la CSP estricta quedan intactos.
+
+---
+
+### Versión 3.6 — respecto a la 3.5
+
+La versión 3.6 no toca la jerarquía organizacional, ni el modelo de datos del
+bien, ni los préstamos, ni el historial, ni la CSP. Ningún rol gana ni pierde
+una capacidad. Cambia **a quién se le puede dar un puesto** y **cuándo se entera
+la pantalla de que los datos que muestra ya no son los que hay**.
+
+Dos observaciones del uso real la motivan. La v3.4 dejó dicho que el puesto de
+Responsable ocupado no se sustituye al asignar (RN-06), pero lo comprobaba
+mirando la Coordinación y no a la persona: quien ya era **administrador** no
+ocupaba ninguna, así que se colaba por esa rendija y podía convertirse en
+responsable u operador de un golpe —y quien lo hacía podía ser él mismo, con lo
+que se dejaba fuera de su propia pantalla—. Y las pantallas pedían sus datos una
+sola vez, al abrirse: un equipo prestado por el compañero de al lado, una
+coordinación que acababa de quedarse sin responsable o un puesto recién asignado
+seguían viéndose como estaban hasta que alguien pulsaba F5, cosa que solo hace
+quien ya sospecha que hay algo que ver.
+
+| Id | Cambio |
+| --- | --- |
+| V36-01 | **El puesto se asigna solo a quien no tiene ninguno, y nunca a uno mismo.** Vale para los tres roles: quien ya es administrador, responsable u operador no cambia de puesto por el hecho de que se le asigne otro, porque eso deja su Coordinación parada o su inventario sin quien lo registre sin que nadie lo haya decidido. Moverla sigue siendo lo que era desde la v3.4: la baja del puesto que tiene y, después, la asignación del nuevo (RN-33, RF-28d, RN-08). Y quien reparte los puestos no es quien los recibe: el Administrador no se asigna un puesto a sí mismo, como tampoco se desactiva su propia cuenta (RF-25). |
+| V36-02 | **Las pantallas se mantienen al día solas.** Cada listado, ficha y panel vuelve a preguntar al servidor cada 30 segundos mientras la pestaña está a la vista, y de inmediato al volver a ella; el armazón hace lo propio con el puesto de quien lo usa, de modo que un cambio de rol se ve en el menú sin cerrar sesión (RF-02, RNF-10). La recarga es silenciosa —sin indicador de carga ni avisos de error— y no ocurre mientras hay una ventana de confirmación abierta ni con la pestaña oculta (RNF-48). |
+| V36-03 | **La pantalla de personas deja de encabezarse con el panel "Coordinaciones sin responsable".** La coordinación parada ya se anuncia donde se administra —su cuadro en rojo en Direcciones, con su botón **Asignar responsable**, que sigue trayendo hasta aquí el encargo planteado (RF-15b, RF-28b)—. Tenerlo en dos sitios era decir dos veces lo mismo, y las dos versiones se contradicen en cuanto una envejece. La lista de personas queda con lo suyo: buscar a alguien y darle su puesto (RF-28). |
+| V36-04 | **El nombre de usuario y el correo institucional se escriben enteros, a mano.** El formulario los componía a partir del nombre real —`jperez`, `juan.perez@inictel-uni.edu.pe`— y acertaba a menudo, que es justo lo que lo hacía peligroso: las veces que no acertaba, el dato equivocado ya estaba escrito, con aspecto de correcto, y nadie relee lo que el propio formulario acaba de rellenar. Un campo vacío se ve; uno mal relleno, no. Además ninguno de los dos los decide el sistema: son los que la institución dio a esa persona (RF-16). |
+| V36-05 | **La lista de coordinaciones se pide al abrir la ventana de asignación, y un fallo deja de ser definitivo.** El cliente memorizaba la lista para no repetir la consulta en cada pantalla, pero memorizaba también el error: bastaba una petición rechazada —la que sale mientras el primer ingreso tiene pendiente el cambio de contraseña, cuando el servidor responde 403 a todo lo que no sea cambiarla (RF-06)— para que la lista quedara vacía en toda la sesión, sin decirlo. Entonces no se podía nombrar a ningún responsable ni operador, porque no había coordinación que elegir, y lo único que se dejaba asignar era el puesto de Administrador, que es el que no necesita ninguna. Ahora el fallo borra la memoria y la ventana vuelve a preguntar cada vez que se abre, así que una coordinación recién creada aparece sin recargar el navegador (RF-28d, RNF-48). |
+| V36-06 | **La persona sin puesto llega del servidor sin el campo `rol`, y el cliente lo completa al entrar.** La API serializa sin los campos nulos, así que quien está registrado sin puesto no trae `rol: null`: no trae `rol`. Para TypeScript son lo mismo, para una comparación no —`undefined !== null` es cierto—, y bastó eso para que la ventana de asignación creyera que toda persona recién registrada ya tenía puesto y no llegara a ofrecer ni el rol ni la Coordinación. Se normaliza en el adaptador, que es quien conoce el formato de la respuesta, y no en cada pantalla que la mira (RF-16b). |
+| V36-07 | **"Mi equipo humano" muestra el equipo, y solo el equipo.** Desaparecen la tarjeta con los datos del propio Responsable —quien abre esa pantalla es esa misma persona, y sus datos están en *Mi cuenta*— y el encabezado "Operadores" sobre la tabla de operadores, que repetía dos renglones más abajo lo que el título de la pantalla ya decía. Se conserva el recuento, que informa de algo (RF-29, RNF-22). |
+| V36-08 | **El Administrador vuelve a ver el inventario de la Coordinación que elige.** RF-46 y RF-49 nunca cambiaron —consulta todas las Coordinaciones, en solo lectura, eligiendo una cada vez—, pero la pantalla no llegaba a pedir el listado: la comprobación "¿ya eligió Coordinación?" era una señal calculada sobre un campo del formulario, que no es una señal, así que se quedaba con su primer valor —"todavía no"— y no volvía a calcularse nunca. El Administrador elegía la Coordinación, el selector cambiaba y la tabla seguía vacía, tuviera los equipos que tuviera. Le pasaba lo mismo a la pantalla de préstamos (RF-68). |
+| V36-09 | **La pantalla de acceso lleva de fondo una fotografía de INICTEL-UNI** (`assets/inictel.jpg`), con un velo suave del degradado de marca —un tercio de opacidad, lo justo para unificar el tono sin tapar la imagen—. El contraste del pie no lo sostiene el velo sino su propia sombra de texto, que funciona sobre cualquier zona de la fotografía, clara u oscura, y no obliga a oscurecerla entera (RNF-32). La imagen se declara en `styles.css` y se sirve desde el propio origen, así que la CSP no se relaja en ninguna directiva (RNF-07). |
+
+**Lo que no cambia.** Los dos actos del alta —registro previo y asignación— y,
+dentro de la asignación, la elección de **rol y Coordinación** tal como estaba
+(RF-28d): tres opciones de rol con su explicación al lado y, si el rol es
+operativo, el selector de Coordinación. La contraseña sigue naciendo con el
+puesto, la baja del Responsable sigue en la ficha de su Coordinación, y el
+aislamiento por Coordinación, el historial del bien y el esquema de la base
+quedan intactos. La v3.6 no ha exigido ninguna migración, ningún endpoint nuevo
+ni ninguno retirado.
+
+---
+
+### Versión 3.5 — respecto a la 3.4
+
+La versión 3.5 no toca el modelo de permisos, ni el aislamiento por
+Coordinación, ni el historial del bien, ni la CSP. Cambia **dónde se trabaja
+sobre una Coordinación**, **qué identifica a una persona** y **qué ocurre
+cuando una Coordinación se queda sin Responsable**. Y, aprovechando que la base
+está vacía, deja el esquema declarado de una vez en lugar de construido por
+parches.
+
+Cuatro observaciones del uso real la motivan. El cuadro de cada Coordinación se
+había ido llenando de controles —seis, en un espacio pensado para leerse de un
+vistazo— mientras que para ver sus laboratorios había que abrir otra ventana.
+La sigla de la Coordinación se quedaba vacía o se rellenaba con una abreviatura
+inventada en el momento, distinta en cada tarjeta. El segundo apellido, siendo
+opcional, se omitía por prisa, y quedaba media identidad registrada en el
+sistema que existe justamente para no confundir a dos personas. Y la baja del
+Responsable dejaba a la Coordinación parada solo a medias: sus Operadores no
+podían registrar equipos ni salidas, pero sí devoluciones.
+
+| Id | Cambio |
+| --- | --- |
+| V35-01 | **El cuadro de cada Coordinación se abre.** Un clic sobre él lleva a su **ficha**, donde están sus laboratorios —con su alta, su edición y su activación—, sus cifras y todas sus acciones: editar datos, ver inventario, activar o desactivar, y el puesto de Responsable. El cuadro conserva lo que sirve para comparar de un vistazo: responsable, tres cifras y estado (RF-15b). Desaparece la ventana suelta de laboratorios, que era un segundo camino al mismo sitio. |
+| V35-02 | **La Coordinación deja de tener sigla, también en la base de datos.** No se pide al crearla, no se muestra y no se guarda: la columna `coordinacion.sigla` no existe. Las Direcciones sí conservan la suya —DIDT y DCTT son como se las nombra en la institución— (RF-11, RF-10). |
+| V35-03 | **En la lista de personas, desactivar y activar salen de la fila.** Viven en la ficha, con el resto de lo que se hace sobre la cuenta de alguien. La fila queda con lo que la lista necesita: **Ver detalle** y **Asignar** (RF-28f). |
+| V35-04 | **El segundo apellido es obligatorio en toda alta y edición**, para los tres roles y también en el primer ingreso del Administrador. La identidad de una persona en la institución son sus dos apellidos, y quien la registra tiene su DNI delante (RF-16, RF-06b, RN-32). |
+| V35-05 | **Una Coordinación sin Responsable está parada del todo.** Sus Operadores no registran equipos, ni salidas, **ni devoluciones**: todas se rechazan explicando por qué. Su panel lo dice al entrar y sus dos botones grandes aparecen apagados, en lugar de responder con un error (RN-07, RF-35c, RF-59b, RF-77b). |
+| V35-06 | **Una ventana a la vez.** Ninguna confirmación se abre encima de otra ventana: el formulario que la pidió se aparta mientras se decide y vuelve al cerrarla. Vale para el alta de personas y para la ficha de la Coordinación (RNF-26). |
+| V35-07 | **Al entrar, el sistema saluda y dice dónde se ha entrado**: nombre de quien accede, su rol, su Coordinación y la Dirección a la que pertenece, con un único botón **Cerrar**. Una vez por ingreso, no por recarga (RF-01b). |
+| V35-08 | **El esquema se declara una sola vez.** Las seis migraciones —la inicial y las cinco que la corregían— se funden en `V1` y `V2`, que describen la base tal como es hoy. Ninguna instalación tenía datos que migrar, y leer seis archivos para saber cómo es una tabla no ayudaba a nadie (sección 5). |
+
+**Lo que no cambia.** El alta sigue partida en registro previo y asignación; la
+baja del Responsable sigue siendo un acto explícito y suyo, y sigue haciendo
+falta antes de nombrar a un sucesor; cada persona sigue perteneciendo a una
+sola Coordinación. Las dos Direcciones siguen precargadas. La matriz de
+permisos no gana ni pierde una capacidad.
+
+---
+
+### Versión 3.4 — respecto a la 3.3
+
+La versión 3.4 no toca el inventario, ni los préstamos, ni el historial del
+bien, ni la CSP. Cambia **cuántas coordinaciones lleva una persona**, **cómo
+se sustituye a un Responsable** y **cuánto se le dice al usuario antes de que
+algo ocurra**.
+
+Tres observaciones del uso real la motivan. La 3.3 admitió que un Responsable
+llevara varias Coordinaciones pensando en el coordinador a cargo de dos
+laboratorios; en la práctica, quien responde por un inventario responde por
+ese inventario, y repartir el cargo reparte también a quién hay que preguntar
+por un equipo. El relevo automático —asignar el puesto de una Coordinación
+ocupada sustituía al vigente en el mismo acto— dejaba a alguien fuera de su
+cargo como efecto colateral de nombrar a otro, sin que nadie hubiera decidido
+darlo de baja. Y la lista de personas mostraba de golpe el DNI, el correo y la
+coordinación de cada uno: siete columnas para encontrar a alguien, cuando para
+encontrarlo basta su nombre.
+
+| Id | Cambio |
+| --- | --- |
+| V34-01 | **Cada persona pertenece a una sola Coordinación.** Vale igual para el RESPONSABLE y para el OPERADOR (RN-05). Mover a alguien deja de ser sumarle un destino: se le da de baja del puesto que tiene y se le asigna después el nuevo. Con ello desaparecen el selector de ámbito del encabezado, la cabecera `X-Coordinacion` y la noción de *coordinación en curso*: el ámbito de una operación ya no es algo que el cliente elija, porque no hay entre qué elegir (RNF-10). |
+| V34-02 | **Asignar el puesto de Responsable de una Coordinación que ya lo tiene se rechaza**, nombrando a quien lo ocupa y diciendo dónde se le da de baja. En el selector, esas Coordinaciones se ven pero no se eligen (RF-19b, RN-06). |
+| V34-03 | **La baja del Responsable es un acto propio, y vive en la tarjeta de su Coordinación.** El botón **Dar baja al responsable** de la pantalla de Direcciones es lo que ocurre cuando alguien renuncia al cargo: el saliente queda como persona registrada, sin coordinación y con su cuenta activa; la tarjeta pasa a rojo y pide un sucesor (RF-26). Solo el Administrador puede hacerlo. Es también la única manera de sustituir a un Responsable: primero la baja, después el nombramiento. |
+| V34-04 | **Una Coordinación sin Responsable no registra ni presta equipos, y ahora el servidor lo impide.** Hasta la 3.3 la tarjeta lo anunciaba pero nada lo comprobaba: un bien podía quedar registrado sin responsable a su nombre. La baja del vigente ya no exige que la Coordinación esté vacía —si lo exigiera, una Coordinación con equipos no podría cambiar nunca de Responsable—; lo que hace es dejarla parada hasta que se nombre al sucesor (RN-07). |
+| V34-05 | **La lista de personas se lee para encontrar a alguien; su ficha, para saber quién es.** Cada fila ofrece **Ver detalle**, y allí viven el DNI, el correo, la coordinación, las fechas y el botón **Editar**, junto a las acciones sobre sus credenciales. La tabla queda con lo que sirve para buscar: persona, rol, usuario y estado de la cuenta (RF-28f). |
+| V34-06 | **Ninguna acción importante ocurre sin una confirmación flotante que diga qué va a pasar.** El alta y la edición de una persona terminan en una ventana con los datos tal como van a quedar, y con **Cancelar** —que cancela el registro— y **Aceptar**. Se suman las confirmaciones que faltaban: asignar un puesto, dar de baja un puesto, restablecer una contraseña, desbloquear una cuenta y activar o desactivar una Coordinación o un Laboratorio (RNF-26). |
+
+**Lo que no cambia.** El alta sigue partida en dos: registro previo primero
+(RF-16b) y asignación después, que es cuando nace la contraseña (RF-28d). Las
+dos Direcciones siguen precargadas y sin alta ni desactivación. El aislamiento
+por Coordinación, el historial del bien, la fotografía en el alta y la CSP
+estricta quedan intactos. La matriz de permisos gana una sola fila —la baja del
+Responsable, exclusiva del Administrador— y no pierde ninguna.
+
+---
+
+### Versión 3.3 — respecto a la 3.2
+
+La versión 3.3 no toca el inventario, ni los préstamos, ni el historial del
+bien, ni el aislamiento por Coordinación. Cambia **cómo entra una persona al
+sistema** y **cuántas Coordinaciones puede llevar**.
+
+Tres observaciones del uso real la motivan. Cuando llega alguien nuevo no
+siempre se sabe todavía dónde va a trabajar, y el formulario de alta obligaba
+a decidirlo el primer día: rol y Coordinación, o no había alta. La contraseña
+nacía con ese alta, para una cuenta que aún no podía hacer nada con ella. Y un
+coordinador de la casa puede estar a cargo de más de un laboratorio, cosa que
+el modelo de una sola adscripción no admitía: había que elegir cuál de sus dos
+puestos se registraba.
+
+| Id | Cambio |
+| --- | --- |
+| V33-01 | **El alta de una persona es un registro previo.** Pide quién es —nombres, apellidos, DNI, cargo, correo y nombre de usuario— y nada más: sin rol, sin Coordinación y sin contraseña utilizable. La persona existe en el sistema, aparece en la lista marcada como **Sin asignar** y todavía no puede entrar (RF-16b). El alta se cierra ahí: confirma lo ocurrido y dice que hay que asignarle una Coordinación y su rol, sin abrir esa ventana ni ningún otro paso (RF-16c). |
+| V33-02 | **La asignación de puesto es un acto aparte, y es donde nace la contraseña.** Desde la lista de personas, el botón **Asignar** da rol y —si es operativo— Coordinación. La contraseña temporal, aleatoria, se genera en ese momento y se muestra una sola vez (RF-28d). Quien ya tenía credenciales de otro puesto conserva las suyas. |
+| V33-03 | **Un RESPONSABLE puede estar a cargo de varias Coordinaciones.** Se le suman de una en una y elige en cuál trabaja desde el encabezado. Un OPERADOR sigue perteneciendo a una sola: registra el día a día de un inventario concreto y repartirlo sería repartir su atención (RN-05). La adscripción deja de ser una columna del usuario y pasa a ser la tabla de asignaciones que siempre fue: una relación, no un atributo. |
+| V33-04 | **El asistente de cambio de responsable desaparece, con su ruta y su endpoint.** Se retiran `/responsables/:id/relevo`, `POST /api/usuarios/coordinacion/{id}/responsable` y `GET /api/usuarios/por-dni/{dni}`. El relevo no se pierde: **es** lo que ocurre al asignar el puesto de Responsable de una Coordinación que ya lo tiene, en la misma transacción y con el aviso previo de a quién sustituye (RF-26, RN-08). Un asistente de tres pasos para lo que ahora es un botón obligaba a elegir la Coordinación antes de poder buscar a la persona, que es justo al revés de como se busca a la gente. |
+| V33-05 | **Crear una Coordinación ya no arrastra a otra pantalla.** La coordinación recién creada se queda a la vista como una tarjeta más de su Dirección, marcada en rojo y con su botón **Asignar responsable**, que lleva a `/personas` con la tarea planteada. Hasta la 3.2 el alta saltaba sola al asistente de relevo: encadenaba dos tareas que no siempre van juntas y sacaba al Administrador de la pantalla que acababa de cambiar, sin haberla visto cambiar (RF-11c). |
+
+**Revertido por la v3.4.** V33-03 y la segunda mitad de V33-04 ya no describen
+el sistema: cada persona vuelve a pertenecer a una sola Coordinación (V34-01) y
+asignar el puesto de un Responsable vigente dejó de relevarlo —se rechaza, y la
+sustitución pasa por la baja explícita del que está (V34-02, V34-03)—. Lo que sí
+sigue vigente de V33-04 es la desaparición del asistente y de sus tres
+endpoints: no han vuelto.
+
+**Lo que no cambió entonces.** La matriz de permisos no ganó ni perdió una capacidad: el
+Administrador sigue repartiendo todos los puestos y el Responsable sigue
+pudiendo dar de alta a los Operadores de su Coordinación —y allí el alta y la
+asignación se resuelven de un tirón, porque el puesto no está en duda. Las dos
+Direcciones siguen precargadas y sin alta ni desactivación. El aislamiento por
+Coordinación, el historial del bien y la CSP estricta quedan intactos.
+
+---
+
+### Versión 3.2 — respecto a la 3.1
+
+La versión 3.2 no toca el modelo de datos del bien, ni el aislamiento por
+Coordinación, ni el modelo de permisos: ningún rol gana ni pierde una sola
+capacidad. Lo que cambia es **dónde encuentra cada cosa el Administrador** y
+qué deja de tener que escribir a mano.
+
+Tres observaciones del uso real la motivan. Las dos Direcciones de INICTEL-UNI
+están en su reglamento y no cambian: pedir que alguien las transcriba el primer
+día es pedir una oportunidad de equivocarse en un dato que ya se sabe. El
+catálogo de categorías se echa en falta registrando un equipo, no navegando un
+menú institucional. Y las personas se buscan por su nombre, no por el rol que
+tienen: separar Responsables de Operadores obligaba a acertar la pantalla antes
+de poder buscar, y dejaba a los Administradores sin ninguna.
+
+| Id | Cambio |
+| --- | --- |
+| V32-01 | **Las dos Direcciones de la institución se precargan con el sistema.** La migración de datos base —entonces `V4`, hoy `V2` (V35-08)— registra la Dirección de Investigación y Desarrollo Tecnológico (DIDT) y la Dirección de Capacitación y Transferencia Tecnológica (DCTT) con su descripción. El Administrador entra a un sistema que ya sabe cómo se organiza la casa (RF-10, RN-30). |
+| V32-02 | **No existe el alta de Direcciones, ni en la pantalla ni en la API.** Desaparece el botón "Nueva dirección" y con él `POST /api/organizacion/direcciones`. Se conserva la corrección de sus datos —nombre, sigla y descripción— porque un nombre mal escrito hay que poder arreglarlo (RF-10). |
+| V32-03 | **Las Direcciones no se desactivan.** Se retiran el control "Mostrar desactivadas" de la pantalla, el botón "Desactivar" de cada Dirección y `PATCH /api/organizacion/direcciones/{id}/estado`. Como la pantalla ya no filtra por estado, el árbol se pide entero: las Coordinaciones desactivadas —que sí pueden desactivarse— siguen a la vista con su distintivo y su botón de activar, en lugar de desaparecer sin retorno. |
+| V32-04 | **La opción del menú "Estructura" pasa a llamarse "Direcciones"** y su ruta pasa de `/estructura` a `/direcciones`. La ruta anterior redirige a la nueva. **El catálogo de categorías sale del menú** y se administra desde el Inventario, con el botón "Gestionar categorías" (RF-31). |
+| V32-05 | **Las personas del sistema se gestionan en una sola pantalla, `/personas`, con filtro por rol.** Sustituye a las secciones separadas de Responsables y Operadores, que redirigen a ella. La lista muestra el rol de cada persona como un distintivo con color y texto, incluye a los Administradores —que antes no aparecían en ninguna lista— y el alta permite elegir cualquiera de los tres roles, como RF-16 siempre previó (RF-28). |
+
+**Lo que no cambió entonces.** El relevo de Responsable conservaba su asistente
+y su ruta `/responsables/:id/relevo`, que la v3.3 retiró (V33-04). El panel
+"Coordinaciones sin responsable" encabezaba la pantalla de personas (RF-28b);
+la v3.6 lo retiró, porque la Coordinación parada ya se anuncia en su cuadro de
+Direcciones (V36-03). El Responsable sigue viendo a su gente en "Mi equipo
+humano". Las reglas de negocio, la matriz de permisos y el aislamiento por
+Coordinación quedaron intactos.
+
+---
+
+### Versión 3.1 — respecto a la 3.0
+
+
+La versión 3.1 no toca la jerarquía organizacional, el aislamiento por
+Coordinación ni el modelo de permisos. Cambia una sola cosa, y en un solo
+punto: **cómo llega la fotografía del bien al sistema**.
+
+Hasta la 3.0 la fotografía solo podía adjuntarse después, desde la ficha del
+bien ya registrado, y siempre eligiendo un archivo del dispositivo. Quien
+inventaría no trabaja así: recorre el laboratorio con una tablet en la mano y
+tiene el equipo delante justo mientras lo registra. Obligarlo a fotografiar
+con la aplicación de cámara, guardar la imagen, terminar el alta, buscar el
+bien en el listado, abrir su ficha y recién ahí subir el archivo son seis
+pasos para lo que el dispositivo resuelve en uno.
+
+| Id | Cambio |
+| --- | --- |
+| V31-01 | **El registro de un bien termina con un paso de fotografía, opcional.** Es el último paso antes del resumen y se puede saltar sin escribir nada: un bien sin foto se registra igual que antes (RF-51b). El paso solo existe en el alta; en la edición la fotografía se sigue cambiando desde la ficha, que es donde ya vivía, para no tener dos sitios que hagan lo mismo. |
+| V31-02 | **Quien registra puede tomar la foto del equipo con la cámara del propio dispositivo**, sin salir del formulario: la aplicación abre un visor en vivo, congela la imagen y la adjunta. Es la vía pensada para la tablet. La alternativa de siempre —elegir una imagen ya guardada— se conserva íntegra y con el mismo peso visual. |
+| V31-03 | **La cámara se habilita solo para el propio origen.** La cabecera `Permissions-Policy` pasa de `camera=()` a `camera=(self)`. Ninguna otra capacidad se abre y la Content-Security-Policy no se relaja en ninguna directiva: el vídeo del visor se enlaza por código sobre el elemento, no por URL. |
+| V31-04 | **Una fotografía que falla nunca tumba un alta.** El bien se registra primero y la imagen se adjunta sobre él; si el envío de la imagen falla, el equipo queda registrado y el sistema avisa que la fotografía quedó pendiente y dónde completarla. |
+
+---
+
+### Versión 3.0 — respecto a la 2.0
+
+La versión 3.0 conserva íntegra la jerarquía organizacional y el aislamiento
+por Coordinación que introdujo la 2.0. Lo que cambia es qué se registra de las
+personas, qué le falta a una Coordinación para poder trabajar y cómo se
+presenta todo ello al Administrador.
+
+| Id | Cambio |
+| --- | --- |
+| V3-01 | **Desaparece la bitácora de acciones por Coordinación.** El sistema deja de registrar quién hizo cada cosa. Se eliminan el módulo 8 completo (RF-69 a RF-74), la ruta `/historial`, la API `/api/historial`, la tabla `auditoria` y el contexto `auditoria` del backend y del frontend. La trazabilidad **del bien** (módulo 6) se conserva intacta: es historial patrimonial, no vigilancia de personas. |
+| V3-02 | **Primer ingreso del Administrador ampliado.** Además de la contraseña, confirma su identidad real: nombres, apellidos y DNI. La cuenta inicial nace con datos de relleno y el DNI es el identificador de una persona en todo el sistema. |
+| V3-03 | **La contraseña se representa siempre con un candado.** El botón de restablecer contraseña de las listas de personas, y el cambio de contraseña propia, llevan el icono de candado en lugar del icono de reinicio. |
+| V3-04 | **Toda Coordinación nace con su primer Laboratorio**, en la misma transacción, y nunca se queda sin ninguno activo. |
+| V3-05 | **Sin laboratorios no se registran bienes.** Un bien sin un lugar donde estar no se puede encontrar después. |
+| V3-06 | **Toda Coordinación recién creada lleva directo a asignar su Responsable**, en la sección de Responsables, eligiendo a alguien que ya existe (buscado por DNI) o dándolo de alta en el mismo acto. |
+| V3-07 | **Las Coordinaciones se presentan en cuadros y no en franjas horizontales.** Cada Coordinación se lee entera de un vistazo y varias se comparan de golpe. |
+| V3-08 | **La adscripción a una sola Coordinación se hace explícita en la interfaz.** El alta de personas dice "Asignar a una coordinación" y advierte que es una y solo una; al dar de alta un Responsable no se ofrecen las Coordinaciones que ya lo tienen. |
+
+---
+
+### Versión 2.0 — respecto a la 1.0
+
+La versión 2.0 reemplazó el modelo plano de una sola área por una jerarquía
+organizacional real y un modelo de permisos multi-inquilino (multi-tenant)
+donde la COORDINACIÓN es la unidad de aislamiento.
+
+| Id | Cambio                                                                                                                                |
+| --- |---------------------------------------------------------------------------------------------------------------------------------------|
+| C-01 | Se incorpora la jerarquía Institución > Dirección > Coordinación > Laboratorio. El campo libre "area" desaparece.                     |
+| C-02 | Los roles son: ADMIN, RESPONSABLE y OPERADOR.                                                                  |
+| C-03 | El inventario deja de ser único y global: cada Coordinación posee su propio inventario, aislado de las demás.                         |
+| C-04 | El Administrador pierde toda capacidad de escritura sobre los bienes. Su rol es estructural y de supervisión, no operativo.           |
+| C-05 | Se eliminan los atributos dinámicos (modelo EAV). El bien pasa a tener un conjunto de campos fijos, ampliado con fecha de adquisición y costo. |
+| C-06 | El campo "estado" del bien se renombra a "condicion" y su valor inicial pasa de DISPONIBLE a OPERATIVO.                               |
+| C-07 | Se incorpora el historial inmutable de movimientos por bien: toda transición de condición queda registrada con su fecha y hora.       |
+| C-08 | Se incorpora el caso de uso "Cambio de Responsable" con relevo obligatorio: una Coordinación nunca puede quedar sin Responsable.      |
+| C-09 | Se incorpora la bitácora de auditoría por Coordinación (suprimida en la v3.0).                                                        |
+| C-10 | La capacidad objetivo sube de 50 a 300 usuarios concurrentes.                                                                         |
+
+---
+
+## Anexo B. Estado de la implementación
+
+Todo lo que este documento especifica está implementado. Este anexo dice **dónde
+vive cada cosa en el código**, versión por versión, para que quien tenga que
+tocar algo sepa por dónde empezar sin recorrer el árbol entero.
+
+### B.1 Fases de implementación
 
 | Fase | Contenido |
 | --- | --- |
@@ -2364,7 +2951,29 @@ al acceso si no hay sesión.
 
 ---
 
-## 12. Estado de la implementación
+### B.2 Qué se implementó en cada versión, y dónde
+
+La versión 3.12 está **implementada en su totalidad** sobre la 3.11. **Cambia
+el esquema** —una restricción, en una migración propia— y añade dos endpoints
+de consulta y dos parámetros de filtro, sin retirar ninguno y sin incorporar
+ninguna dependencia. En la interfaz retira lo que sobraba: la suspensión de
+cuentas y dos autorías repetidas en la ficha del bien.
+
+| Cambio | Dónde vive |
+| --- | --- |
+| V312-01 Sin suspensión | `EstadoCuenta` queda en `ACTIVA` y `BAJA`; `Usuario` pierde `suspender()` y `reactivar()`, y `exigirCuentaUtilizable` deja de tener que explicar cuál de las dos formas de no entrar es. `GestionUsuariosServicio.cambiarEstado` pasa de un `switch` de tres ramas a dos caminos con nombre: dar de baja o reincorporar. Frontend: el tipo `EstadoCuenta`, `ESTADOS_CUENTA` y `claseEstadoCuenta` en `usuario.model.ts`, y los botones y textos de confirmación de `personas`, `detalle-persona` y `mi-equipo` |
+| V312-02 Dos operaciones | `CambioEstadoCuentaRequest` sigue viajando el estado destino: con dos valores el enum sigue siendo mejor que un booleano, porque *baja* y *reincorporación* no son el mismo acto al derecho y al revés (la segunda no devuelve el puesto). Un `SUSPENDIDA` entrante ya no deserializa y Spring responde 400 |
+| V312-03 El aviso previo | El puerto `BienesACargo` gana `listarDe`, con su registro `BienACargo` propio de `iam` —el contexto de personas no queda atado a la ficha de un bien (RNF-39)—; `ServicioPublicoInventario.listarBienesACargoDe` lo resuelve del otro lado. Caso de uso `GestionUsuariosServicio.equiposACargoDe`, tras el mismo `exigirPermisoDeGestion` que la baja, y endpoint `GET /api/usuarios/{id}/equipos-a-cargo`. Frontend: `EquiposACargo` en el modelo, el puerto, el adaptador y la fachada; `DetallePersona` lo consulta en el *setter* de su `@Input` y desactiva el botón con la lista debajo |
+| V312-04 El mensaje que nombra | `exigirQueNoTengaBienesACargo` pasa de contar a listar, y `nombrar` cita los tres primeros con su código y cuenta el resto. Lo usan por igual la baja de la cuenta y la baja del puesto (`retirarDe`), que son las dos operaciones que RN-38 frena |
+| V312-05 El filtro por responsable | `FiltroEquipos` gana `responsableEquipoId` y `sinResponsableEquipo`, con la fábrica `aCargoDe`; `EquipoSpecifications.aCargoDe` los traduce a un `equal` o a un `isNull` sobre la misma columna, porque son la misma pregunta. `EquipoController.listar` y `ExportacionController` los reciben, de modo que el reporte sale con el recorte de la pantalla. `EquipoResumenDto` gana el identificador y el nombre de quien lo tiene, resuelto contra una memoria de la propia página para no pedir cincuenta veces los mismos tres nombres |
+| V312-06 Mis equipos | Frontend: `responsableEquipoElegido` admite un identificador, el literal `'responsable'` o nulo —los tres estados que el servidor distingue y que un solo `null` confundiría—; el botón de cabecera, el desplegable con recuentos, la columna *A cargo de* y el estado vacío que explica lo que pasa. `mi-equipo` enlaza con `?responsable=<id>`, que el listado lee al abrirse |
+| V312-07 El reparto agrupado | `EquipoJpaRepository.contarPorResponsableDeEquipo` agrupa en la base; el puerto lo expone como `List<ConteoACargo>` —un registro y no un `Map`, porque la clave nula es una fila con significado y no un hueco—; `GestionInventarioServicio.responsablesDeEquipo` resuelve los nombres, pone primero al Responsable de la coordinación y exige al Administrador elegir una. Endpoint `GET /api/equipos/responsables` |
+| V312-08 La migración | `V3__retiro_suspension_cuenta.sql`: `UPDATE` de los suspendidos a `ACTIVA` y `ck_usuario_estado` rehecho. `V1` se deja intacta a propósito: reescribir una migración ya aplicada deja la base sin poder migrar, y ese es el motivo por el que esta vez no se rehace la línea base |
+| V312-09 La ficha, sin autorías repetidas | `detalle-bien.html`: salen los dos bloques *Responsable a cargo* y *Registrado por*, y queda la *Fecha de registro*. `EquipoDto` conserva `responsable`, `responsableId` y `registradoPor` porque la exportación del inventario los imprime (`GeneradorReporteInventarioArchivos`); el modelo del frontend también, porque describe lo que la API devuelve |
+| V312-10 El historial rotulado | `MovimientoDto`: el campo `resumen` —que no consumía nadie y repetía el título del hito— se sustituye por `autoria`, que compone `"Registrado por: Nombre (Rol)"` en el `ALTA` y `"Nombre (Rol)"` en el resto. La plantilla del historial lo pinta en lugar de componer el nombre y el rol por su cuenta. `MovimientoDtoTest` cubre los cuatro casos: alta, otro hecho, sin rol y sin autor |
+| V312-11 Comprobación | Las 85 pruebas del backend —las de la suspensión reescritas sobre la baja, más cuatro nuevas de la autoría— y las 45 del frontend en verde, y las dos compilaciones limpias. Verificado además contra PostgreSQL 17: las tres migraciones aplican sobre una base vacía, el reparto por responsable responde y la baja bloqueada por RN-38 se rechaza nombrando los equipos |
+
+---
 
 La versión 3.11 está **implementada en su totalidad** sobre la 3.10. No toca el
 esquema, no añade ni retira endpoints —uno cambia de rol permitido— y no

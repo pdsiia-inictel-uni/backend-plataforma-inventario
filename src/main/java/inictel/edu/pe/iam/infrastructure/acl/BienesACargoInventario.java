@@ -4,6 +4,8 @@ import inictel.edu.pe.iam.domain.service.BienesACargo;
 import inictel.edu.pe.inventario.application.service.ServicioPublicoInventario;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Adaptador anticorrupcion de {@code iam} hacia {@code inventario} (RNF-39).
  *
@@ -23,6 +25,14 @@ public class BienesACargoInventario implements BienesACargo {
     @Override
     public long contarDe(Long usuarioId) {
         return inventario.contarBienesACargoDe(usuarioId);
+    }
+
+    @Override
+    public List<BienACargo> listarDe(Long usuarioId) {
+        return inventario.listarBienesACargoDe(usuarioId).stream()
+                .map(bien -> new BienACargo(
+                        bien.id(), bien.nombre(), bien.codigoInventario(), bien.laboratorio()))
+                .toList();
     }
 
     @Override

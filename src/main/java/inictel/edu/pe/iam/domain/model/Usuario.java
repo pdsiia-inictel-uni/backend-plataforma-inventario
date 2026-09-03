@@ -303,18 +303,15 @@ public class Usuario {
     /**
      * Cuenta lista para trabajar: la asignacion es lo unico que le falta.
      *
-     * <p>Dar un puesto a quien no puede entrar deja una Coordinacion a cargo de
-     * alguien que no puede atenderla: la suspendida esta fuera por ahora y la
-     * de baja ya no pertenece a la institucion (RF-22b).</p>
+     * <p>Dar un puesto a quien ya no pertenece a la institucion deja una
+     * Coordinacion a cargo de alguien que no puede atenderla (RF-22b).</p>
      */
     private void exigirCuentaUtilizable() {
         if (estado.permiteEntrar()) {
             return;
         }
-        String motivo = estado == EstadoCuenta.BAJA
-                ? "esta dada de baja de la institucion. Reincorporela antes de asignarle un puesto."
-                : "tiene la cuenta suspendida. Reactivela antes de asignarle un puesto.";
-        throw new ReglaNegocioException("'" + nombreCompleto() + "' " + motivo);
+        throw new ReglaNegocioException("'" + nombreCompleto() + "' esta dado de baja de la "
+                + "institucion. Reincorporelo antes de asignarle un puesto.");
     }
 
     /**
@@ -346,37 +343,6 @@ public class Usuario {
     // ------------------------------------------------------------------
     // RF-22, RF-22b: estado de la cuenta. El usuario nunca se elimina (RN-09)
     // ------------------------------------------------------------------
-
-    /**
-     * RF-22b: la persona no entra por ahora —vacaciones, permiso, licencia—.
-     *
-     * <p><b>Conserva su puesto</b>, y es lo que distingue esta operacion de la
-     * baja: la suspension es temporal y quien vuelve, vuelve a lo suyo. Una
-     * Coordinacion cuyo Responsable esta de vacaciones sigue teniendo
-     * Responsable.</p>
-     */
-    public void suspender() {
-        if (estado == EstadoCuenta.BAJA) {
-            throw new ReglaNegocioException(
-                    "'" + nombreCompleto() + "' ya esta dado de baja de la institucion: no hay nada "
-                            + "que suspender. Reincorporelo si vuelve a trabajar aqui.");
-        }
-        this.estado = EstadoCuenta.SUSPENDIDA;
-        this.fechaActualizacion = LocalDateTime.now();
-    }
-
-    /** RF-22b: termina la suspension. La persona vuelve a su puesto y entra. */
-    public void reactivar() {
-        if (estado == EstadoCuenta.BAJA) {
-            throw new ReglaNegocioException(
-                    "'" + nombreCompleto() + "' esta dado de baja de la institucion. Use la "
-                            + "reincorporacion, que le devuelve la cuenta pero no el puesto.");
-        }
-        this.estado = EstadoCuenta.ACTIVA;
-        this.intentosFallidos = 0;
-        this.bloqueadoHasta = null;
-        this.fechaActualizacion = LocalDateTime.now();
-    }
 
     /**
      * RF-22b, RN-34: la persona deja la institucion.
