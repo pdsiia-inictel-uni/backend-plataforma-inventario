@@ -8,5 +8,5 @@ target/
 .idea/
 .vscode/
 .git/
-README.md
+DOCUMENT.md
 uploads/
