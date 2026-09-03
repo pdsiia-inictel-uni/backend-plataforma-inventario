@@ -1,0 +1,13 @@
+# Lo que no debe entrar en el contexto de construccion: acelera el build y,
+# sobre todo, evita que un .env con credenciales acabe dentro de la imagen.
+.env
+.env.*
+!.env.example
+target/
+*.log
+.idea/
+.vscode/
+.git/
+README.md
+README.md.txt.bak
+uploads/

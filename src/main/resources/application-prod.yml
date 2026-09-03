@@ -1,0 +1,50 @@
+# =============================================================================
+# Perfil de PRODUCCION
+#
+# Se activa con la variable real del sistema operativo:
+#     $env:SPRING_PROFILES_ACTIVE = "prod"
+# o con el argumento:
+#     java -jar backend.jar --spring.profiles.active=prod
+#
+# Los valores salen de backend/.env.prod. En un despliegue con contenedores
+# ese archivo se inyecta como variables reales (env_file / secrets) y el
+# 'optional:' hace que la ausencia del archivo no sea un problema.
+# =============================================================================
+
+spring:
+  config:
+    import: optional:file:./.env.prod[.properties]
+
+  # Las consultas nunca se imprimen en produccion: ensucian el log y filtran
+  # datos personales (RNF-46, Ley 29733).
+  jpa:
+    show-sql: false
+
+# ===== Exigencias del entorno productivo =====================================
+# Estas tres no admiten valor de respaldo NI AQUI NI EN NINGUN SITIO: si el
+# despliegue olvida definirlas, la aplicacion se niega a arrancar en lugar de
+# quedarse escuchando con la clave de desarrollo o con el CORS abierto al
+# localhost de cualquiera. Es mas barato un arranque fallido que una brecha.
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+  cors:
+    origenes-permitidos: ${APP_CORS_ORIGENES_PERMITIDOS}
+  archivos:
+    # Ruta absoluta y persistente: un redespliegue no puede llevarse por
+    # delante las fotografias de los bienes.
+    directorio: ${APP_ARCHIVOS_DIRECTORIO}
+
+# ===== RNF-08: sin superficie de API publicada ===============================
+# Se fuerza apagado, aunque el archivo de entorno dijera lo contrario.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    inictel.edu.pe: INFO
+    org.hibernate.SQL: WARN

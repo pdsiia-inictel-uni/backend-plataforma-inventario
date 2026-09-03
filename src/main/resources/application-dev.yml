@@ -1,0 +1,28 @@
+# =============================================================================
+# Perfil de DESARROLLO  (activo por defecto)
+#
+# Su unica responsabilidad es decir DE DONDE salen los valores y como de
+# hablador es el log. Los valores en si estan en backend/.env.
+#
+# 'optional:' permite arrancar sin el archivo cuando las variables ya vienen
+# del sistema operativo (por ejemplo desde un contenedor). Si no vienen de
+# ningun sitio, la aplicacion se niega a arrancar y el error muestra la
+# variable sin resolver: nunca un valor de ejemplo por sorpresa.
+#
+# '[.properties]' declara el formato: el archivo se llama '.env' y no tiene
+# extension, asi que hay que decirle a Spring como leerlo.
+# =============================================================================
+
+spring:
+  config:
+    import: optional:file:./.env[.properties]
+
+# Una variable real del sistema operativo gana siempre sobre el archivo, de
+# modo que se puede probar un ajuste puntual sin editar el .env:
+#     $env:SERVER_PORT = "9090"; .\mvnw.cmd spring-boot:run
+
+logging:
+  level:
+    root: INFO
+    inictel.edu.pe: INFO
+    org.hibernate.SQL: WARN

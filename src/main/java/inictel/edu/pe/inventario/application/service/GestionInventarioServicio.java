@@ -1,0 +1,513 @@
+package inictel.edu.pe.inventario.application.service;
+
+import inictel.edu.pe.compartido.domain.CriterioPagina;
+import inictel.edu.pe.compartido.domain.Pagina;
+import inictel.edu.pe.compartido.domain.excepcion.AccesoDenegadoException;
+import inictel.edu.pe.compartido.domain.excepcion.DatosInvalidosException;
+import inictel.edu.pe.compartido.domain.excepcion.RecursoNoEncontradoException;
+import inictel.edu.pe.compartido.domain.excepcion.ReglaNegocioException;
+import inictel.edu.pe.compartido.domain.seguridad.ContextoUsuario;
+import inictel.edu.pe.compartido.domain.seguridad.UsuarioAutenticado;
+import inictel.edu.pe.inventario.application.comando.GuardarEquipoComando;
+import inictel.edu.pe.inventario.application.dto.EquipoDto;
+import inictel.edu.pe.inventario.application.dto.EquipoResumenDto;
+import inictel.edu.pe.inventario.application.dto.MovimientoDto;
+import inictel.edu.pe.inventario.domain.model.Categoria;
+import inictel.edu.pe.inventario.domain.model.CodigoBien;
+import inictel.edu.pe.inventario.domain.model.CondicionEquipo;
+import inictel.edu.pe.inventario.domain.model.Equipo;
+import inictel.edu.pe.inventario.domain.model.MovimientoEquipo;
+import inictel.edu.pe.inventario.domain.model.NumeroSerie;
+import inictel.edu.pe.inventario.domain.model.ReferenciaCategoria;
+import inictel.edu.pe.inventario.domain.model.TipoMovimiento;
+import inictel.edu.pe.inventario.domain.repository.CategoriaRepositorio;
+import inictel.edu.pe.inventario.domain.repository.EquipoRepositorio;
+import inictel.edu.pe.inventario.domain.repository.FiltroEquipos;
+import inictel.edu.pe.inventario.domain.repository.MovimientoRepositorio;
+import inictel.edu.pe.inventario.domain.service.AlmacenFotos;
+import inictel.edu.pe.inventario.domain.service.DirectorioUsuarios;
+import inictel.edu.pe.inventario.domain.service.UbicacionesDisponibles;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.InputStream;
+import java.util.List;
+
+/**
+ * Casos de uso del inventario de bienes (RF-34 .. RF-57).
+ *
+ * <p>Dos responsabilidades atraviesan todo el servicio:</p>
+ * <ul>
+ *   <li><b>Aislamiento</b> (RN-23): ninguna operacion toca un bien de otra
+ *       Coordinacion. El identificador de Coordinacion jamas llega del cliente:
+ *       se deduce del usuario autenticado.</li>
+ *   <li><b>Trazabilidad</b> (RN-20): toda transicion de condicion deja un
+ *       movimiento inmutable en la linea de tiempo del bien.</li>
+ * </ul>
+ */
+@Service
+public class GestionInventarioServicio {
+
+    private final EquipoRepositorio equipos;
+    private final MovimientoRepositorio movimientos;
+    private final CategoriaRepositorio categorias;
+    private final DirectorioUsuarios directorio;
+    private final UbicacionesDisponibles ubicaciones;
+    private final AlmacenFotos almacenFotos;
+    private final ContextoUsuario contexto;
+
+    public GestionInventarioServicio(EquipoRepositorio equipos,
+                                     MovimientoRepositorio movimientos,
+                                     CategoriaRepositorio categorias,
+                                     DirectorioUsuarios directorio,
+                                     UbicacionesDisponibles ubicaciones,
+                                     AlmacenFotos almacenFotos,
+                                     ContextoUsuario contexto) {
+        this.equipos = equipos;
+        this.movimientos = movimientos;
+        this.categorias = categorias;
+        this.directorio = directorio;
+        this.ubicaciones = ubicaciones;
+        this.almacenFotos = almacenFotos;
+        this.contexto = contexto;
+    }
+
+    // ------------------------------------------------------------------
+    // Consultas (RF-47 .. RF-50)
+    // ------------------------------------------------------------------
+
+    /**
+     * RF-47, RF-49: listado paginado.
+     *
+     * <p>El Responsable y el Operador ven siempre su Coordinacion, envien lo que
+     * envien. El Administrador debe elegir cual consultar (RF-49); sin eleccion
+     * ve toda la institucion.</p>
+     */
+    @Transactional(readOnly = true)
+    public Pagina<EquipoResumenDto> buscar(FiltroEquipos filtro, CriterioPagina criterio) {
+        return equipos.buscar(acotar(filtro), criterio)
+                .mapear(equipo -> EquipoResumenDto.de(equipo,
+                        ubicaciones.nombreDeLaboratorio(equipo.getLaboratorioId()).orElse(null)));
+    }
+
+    @Transactional(readOnly = true)
+    public EquipoDto obtener(Long id) {
+        Equipo equipo = exigirEquipo(id);
+        exigirLectura(equipo);
+        return componer(equipo);
+    }
+
+    /** RF-56, RF-57: linea de tiempo completa del bien. */
+    @Transactional(readOnly = true)
+    public List<MovimientoDto> historial(Long id) {
+        Equipo equipo = exigirEquipo(id);
+        exigirLectura(equipo);
+        return movimientos.historialDe(id).stream().map(MovimientoDto::de).toList();
+    }
+
+    // ------------------------------------------------------------------
+    // RF-34 .. RF-37: registro
+    // ------------------------------------------------------------------
+
+    /**
+     * Registra un bien en la Coordinacion del usuario en curso.
+     *
+     * <p>El bien nace OPERATIVO y a cargo del Responsable vigente de la
+     * Coordinacion, aunque quien complete el formulario sea un Operador
+     * (RF-35, RF-36).</p>
+     */
+    @Transactional
+    public EquipoDto crear(GuardarEquipoComando comando) {
+        UsuarioAutenticado actual = exigirOperativo();
+        Long coordinacionId = actual.coordinacionRequerida();
+
+        // RN-26: sin laboratorios no hay donde poner el bien, y un bien que no
+        // se sabe donde esta no sirve de nada en un inventario.
+        if (!ubicaciones.tieneLaboratoriosActivos(coordinacionId)) {
+            throw new ReglaNegocioException(
+                    "Su coordinacion aun no tiene laboratorios activos. "
+                            + "Pida al Administrador que registre al menos uno antes de dar de alta equipos.");
+        }
+
+        NumeroSerie numeroSerie = new NumeroSerie(comando.numeroSerie());
+        CodigoBien codigoInventario = CodigoBien.inventario(comando.codigoInventario());
+        CodigoBien codigoPatrimonial = CodigoBien.patrimonial(comando.codigoPatrimonial());
+
+        validarUnicidad(numeroSerie, codigoInventario, codigoPatrimonial, null);
+        ReferenciaCategoria categoria = resolverCategoria(comando.categoriaId(), null);
+        Long laboratorioId = resolverLaboratorio(comando.laboratorioId(), coordinacionId);
+
+        // RF-36: el responsable es el del cargo, no el que teclea. RN-07: si el
+        // cargo esta vacante no hay quien responda por el equipo, asi que la
+        // coordinacion no registra hasta que se nombre a otro. Es lo que anuncia
+        // su tarjeta en rojo desde que se le da de baja al anterior (RF-26).
+        Long responsableId = directorio.responsableVigenteDe(coordinacionId)
+                .orElseThrow(() -> new ReglaNegocioException(
+                        "Su coordinacion no tiene responsable en este momento, asi que no hay quien "
+                                + "responda por los equipos que se registren. Pida al Administrador "
+                                + "que nombre uno."));
+
+        Equipo equipo = Equipo.registrar(
+                coordinacionId,
+                laboratorioId,
+                comando.nombre(),
+                comando.marca(),
+                comando.modelo(),
+                numeroSerie,
+                codigoInventario,
+                codigoPatrimonial,
+                categoria,
+                comando.fechaAdquisicion(),
+                comando.costo(),
+                comando.observaciones(),
+                responsableId,
+                actual.id());
+
+        Equipo guardado = equipos.guardar(equipo);
+
+        registrarMovimiento(guardado, TipoMovimiento.ALTA, null,
+                "Alta del bien en el inventario. Queda en condicion Operativo.");
+
+        return componer(guardado);
+    }
+
+    // ------------------------------------------------------------------
+    // RF-40: edicion
+    // ------------------------------------------------------------------
+
+    @Transactional
+    public EquipoDto editar(GuardarEquipoComando comando) {
+        Equipo equipo = exigirEquipo(comando.id());
+        exigirResponsableDe(equipo);
+
+        NumeroSerie numeroSerie = new NumeroSerie(comando.numeroSerie());
+        CodigoBien codigoInventario = CodigoBien.inventario(comando.codigoInventario());
+        CodigoBien codigoPatrimonial = CodigoBien.patrimonial(comando.codigoPatrimonial());
+
+        validarUnicidad(numeroSerie, codigoInventario, codigoPatrimonial, equipo.getId());
+        ReferenciaCategoria categoria = resolverCategoria(comando.categoriaId(), equipo.getCategoria());
+        Long laboratorioId = resolverLaboratorio(comando.laboratorioId(), equipo.getCoordinacionId());
+
+        Long laboratorioAnterior = equipo.getLaboratorioId();
+
+        equipo.actualizarDatos(laboratorioId, comando.nombre(), comando.marca(), comando.modelo(),
+                numeroSerie, codigoInventario, codigoPatrimonial, categoria,
+                comando.fechaAdquisicion(), comando.costo(), comando.observaciones());
+
+        Equipo guardado = equipos.guardar(equipo);
+
+        // Una reubicacion es un hecho distinto de una edicion: se registra aparte.
+        boolean reubicado = laboratorioAnterior == null
+                ? laboratorioId != null
+                : !laboratorioAnterior.equals(laboratorioId);
+        if (reubicado) {
+            registrarMovimiento(guardado, TipoMovimiento.REUBICACION, guardado.getCondicion(),
+                    "Reubicado en " + nombreLaboratorioODefecto(laboratorioId) + ".");
+        }
+        registrarMovimiento(guardado, TipoMovimiento.EDICION, guardado.getCondicion(),
+                "Actualizacion de los datos del bien.");
+
+        return componer(guardado);
+    }
+
+    // ------------------------------------------------------------------
+    // RF-83: responsable del equipo
+    // ------------------------------------------------------------------
+
+    /**
+     * Pone el bien a cargo de un Operador de la Coordinacion, o lo devuelve a
+     * cargo del Responsable.
+     *
+     * <p>Es una decision del <b>Responsable</b> y solo suya: es quien responde
+     * por el inventario entero y quien reparte el trabajo dentro de su
+     * Coordinacion. Un Operador no se asigna equipos a si mismo ni se los pasa
+     * a un companero (RF-83, RN-37).</p>
+     *
+     * <p>{@code operadorId} nulo significa <em>devolver el bien al
+     * Responsable</em>: es lo que el usuario ve como "me lo quedo yo" y lo que
+     * hay que hacer antes de que un Operador con equipos a su nombre pueda
+     * dejar su puesto (RN-38).</p>
+     */
+    @Transactional
+    public EquipoDto asignarResponsableDeEquipo(Long equipoId, Long operadorId) {
+        Equipo equipo = exigirEquipo(equipoId);
+        exigirResponsableDe(equipo);
+
+        String anterior = nombreDeQuienLoTieneACargo(equipo);
+
+        if (operadorId == null) {
+            if (!equipo.estaACargoDeUnOperador()) {
+                throw new ReglaNegocioException(
+                        "El equipo ya esta a su cargo como responsable de la coordinacion.");
+            }
+            equipo.devolverAlResponsableDeCoordinacion();
+        } else {
+            // RN-37: solo un Operador activo de esta misma Coordinacion. Se
+            // comprueba aqui y no en el agregado porque el bien no conoce a las
+            // personas, solo sus identificadores (RNF-39).
+            if (!directorio.esOperadorActivoDe(operadorId, equipo.getCoordinacionId())) {
+                throw new DatosInvalidosException("responsableEquipoId",
+                        "Un equipo solo se entrega a un operador activo de su coordinacion.");
+            }
+            equipo.ponerACargoDe(operadorId);
+        }
+
+        Equipo guardado = equipos.guardar(equipo);
+        String ahora = nombreDeQuienLoTieneACargo(guardado);
+
+        registrarMovimiento(guardado, TipoMovimiento.RESPONSABLE, guardado.getCondicion(),
+                "El equipo pasa de " + anterior + " a " + ahora + ".");
+
+        return componer(guardado);
+    }
+
+    // ------------------------------------------------------------------
+    // RF-41 .. RF-43: condicion, baja y reincorporacion
+    // ------------------------------------------------------------------
+
+    /** RF-41: el Responsable retira el bien del servicio. */
+    @Transactional
+    public EquipoDto enviarAMantenimiento(Long id, String motivo) {
+        Equipo equipo = exigirEquipo(id);
+        exigirResponsableDe(equipo);
+
+        CondicionEquipo anterior = equipo.getCondicion();
+        equipo.enviarAMantenimiento(motivo);
+        Equipo guardado = equipos.guardar(equipo);
+
+        String detalle = motivo == null || motivo.isBlank()
+                ? "Enviado a mantenimiento."
+                : "Enviado a mantenimiento. Motivo: " + motivo.trim();
+        registrarMovimiento(guardado, TipoMovimiento.MANTENIMIENTO, anterior, detalle);
+
+        return componer(guardado);
+    }
+
+    /** RF-41: el bien vuelve al servicio, o se cierra la alerta de revision. */
+    @Transactional
+    public EquipoDto devolverAOperativo(Long id, String observacion) {
+        Equipo equipo = exigirEquipo(id);
+        exigirResponsableDe(equipo);
+
+        CondicionEquipo anterior = equipo.getCondicion();
+        boolean cerrabaRevision = equipo.isRevisionPendiente();
+        equipo.devolverAOperativo();
+        Equipo guardado = equipos.guardar(equipo);
+
+        String base = cerrabaRevision
+                ? "Revision conforme tras la devolucion con observaciones."
+                : "Devuelto a condicion operativa.";
+        String detalle = observacion == null || observacion.isBlank()
+                ? base
+                : base + " " + observacion.trim();
+        registrarMovimiento(guardado, TipoMovimiento.OPERATIVO, anterior, detalle);
+
+        return componer(guardado);
+    }
+
+    /** RF-42: baja logica con motivo. */
+    @Transactional
+    public EquipoDto darDeBaja(Long id, String motivo) {
+        Equipo equipo = exigirEquipo(id);
+        exigirResponsableDe(equipo);
+
+        CondicionEquipo anterior = equipo.getCondicion();
+        equipo.darDeBaja(motivo);
+        Equipo guardado = equipos.guardar(equipo);
+
+        registrarMovimiento(guardado, TipoMovimiento.BAJA, anterior,
+                "Baja del inventario. Motivo: " + guardado.getMotivoBaja());
+
+        return componer(guardado);
+    }
+
+    /** RF-43: reincorporacion al inventario operativo. */
+    @Transactional
+    public EquipoDto reincorporar(Long id, String motivo) {
+        Equipo equipo = exigirEquipo(id);
+        exigirResponsableDe(equipo);
+
+        CondicionEquipo anterior = equipo.getCondicion();
+        equipo.reincorporar();
+        Equipo guardado = equipos.guardar(equipo);
+
+        String detalle = motivo == null || motivo.isBlank()
+                ? "Reincorporado al inventario."
+                : "Reincorporado al inventario. Motivo: " + motivo.trim();
+        registrarMovimiento(guardado, TipoMovimiento.REINCORPORACION, anterior, detalle);
+
+        return componer(guardado);
+    }
+
+    // ------------------------------------------------------------------
+    // RF-51: fotografia
+    // ------------------------------------------------------------------
+
+    @Transactional
+    public EquipoDto asignarFoto(Long id, String nombreOriginal, String tipoContenido, InputStream contenido) {
+        Equipo equipo = exigirEquipo(id);
+        // RF-45, RF-51c: sobre un bien ya registrado solo escribe el Responsable,
+        // y la fotografia es un dato del bien como cualquier otro. Hasta la
+        // v3.10 la adjuntaba tambien el Operador desde la ficha, que era la
+        // unica escritura suya sobre un equipo existente.
+        exigirResponsableDe(equipo);
+
+        String url = almacenFotos.guardar(nombreOriginal, tipoContenido, contenido);
+        equipo.asignarFoto(url);
+        Equipo guardado = equipos.guardar(equipo);
+
+        return componer(guardado);
+    }
+
+    // ------------------------------------------------------------------
+    // Autorizacion (RN-22, RN-23)
+    // ------------------------------------------------------------------
+
+    /**
+     * RF-49: acota el filtro al ambito permitido.
+     *
+     * <p>Para un usuario operativo la Coordinacion se impone; para el
+     * Administrador se respeta la que eligio, y si no eligio ninguna se
+     * consulta toda la institucion en solo lectura (RF-46). Pedir el
+     * inventario de una Coordinacion ajena no devuelve el propio: se
+     * rechaza (RNF-10).</p>
+     */
+    private FiltroEquipos acotar(FiltroEquipos filtro) {
+        UsuarioAutenticado actual = contexto.requerido();
+        Long ambito = actual.ambitoDeConsulta(filtro.coordinacionId());
+        return ambito == null ? filtro : filtro.enCoordinacion(ambito);
+    }
+
+    /** RF-46: el Administrador lee todo; los demas, solo lo suyo. */
+    private void exigirLectura(Equipo equipo) {
+        UsuarioAutenticado actual = contexto.requerido();
+        if (!actual.puedeLeerCoordinacion(equipo.getCoordinacionId())) {
+            throw new AccesoDenegadoException("No tiene acceso a los bienes de otra coordinacion.");
+        }
+    }
+
+    /**
+     * RN-22: el Administrador no escribe en el inventario. Devuelve al usuario
+     * operativo (Responsable u Operador) que si puede hacerlo.
+     */
+    private UsuarioAutenticado exigirOperativo() {
+        UsuarioAutenticado actual = contexto.requerido();
+        if (actual.esAdmin()) {
+            throw new AccesoDenegadoException(
+                    "El Administrador no registra ni modifica bienes. Esa gestion corresponde al "
+                            + "responsable y a los operadores de cada coordinacion.");
+        }
+        return actual;
+    }
+
+    private void exigirOperativoDe(Equipo equipo) {
+        UsuarioAutenticado actual = exigirOperativo();
+        actual.exigirAccesoA(equipo.getCoordinacionId());
+    }
+
+    /** RF-45: editar, cambiar condicion y dar de baja son del Responsable. */
+    private void exigirResponsableDe(Equipo equipo) {
+        UsuarioAutenticado actual = exigirOperativo();
+        if (!actual.esResponsable()) {
+            throw new AccesoDenegadoException(
+                    "Solo el responsable de la coordinacion puede modificar o dar de baja un bien.");
+        }
+        actual.exigirAccesoA(equipo.getCoordinacionId());
+    }
+
+    // ------------------------------------------------------------------
+    // Apoyo
+    // ------------------------------------------------------------------
+
+    private void registrarMovimiento(Equipo equipo, TipoMovimiento tipo,
+                                     CondicionEquipo anterior, String detalle) {
+        movimientos.registrar(MovimientoEquipo.registrar(
+                equipo.getId(), tipo, anterior, equipo.getCondicion(), detalle,
+                contexto.actual().orElse(null)));
+    }
+
+    private EquipoDto componer(Equipo equipo) {
+        return EquipoDto.de(equipo,
+                ubicaciones.nombreDeCoordinacion(equipo.getCoordinacionId()).orElse(null),
+                ubicaciones.nombreDeLaboratorio(equipo.getLaboratorioId()).orElse(null),
+                directorio.nombreDe(equipo.getResponsableId()).orElse("Sin responsable asignado"),
+                nombreDeQuienLoTieneACargo(equipo),
+                directorio.nombreDe(equipo.getUsuarioRegistroId()).orElse("Usuario no disponible"));
+    }
+
+    /**
+     * RF-83: quien responde por el bien hoy.
+     *
+     * <p>El Operador a su cargo si lo tiene; si no, el Responsable vigente de
+     * la Coordinacion, que es lo que significa no tenerlo (RN-37). Se resuelve
+     * al leer y no se guarda: asi un relevo de Responsable no obliga a tocar
+     * ni un bien, y la ficha nunca nombra a alguien que ya dejo el puesto.</p>
+     */
+    private String nombreDeQuienLoTieneACargo(Equipo equipo) {
+        if (equipo.estaACargoDeUnOperador()) {
+            return directorio.nombreDe(equipo.getResponsableEquipoId())
+                    .orElse("Usuario no disponible");
+        }
+        return directorio.responsableVigenteDe(equipo.getCoordinacionId())
+                .flatMap(directorio::nombreDe)
+                .orElse("Sin responsable asignado");
+    }
+
+    private String nombreLaboratorioODefecto(Long laboratorioId) {
+        if (laboratorioId == null) {
+            return "ningun laboratorio";
+        }
+        return ubicaciones.nombreDeLaboratorio(laboratorioId).orElse("otro laboratorio");
+    }
+
+    private Equipo exigirEquipo(Long id) {
+        return equipos.buscarPorId(id)
+                .orElseThrow(() -> RecursoNoEncontradoException.de("el bien", id));
+    }
+
+    /** RN-14: unicidad institucional de serie y codigos. */
+    private void validarUnicidad(NumeroSerie numeroSerie, CodigoBien inventario, CodigoBien patrimonial,
+                                 Long idActual) {
+        DatosInvalidosException errores = new DatosInvalidosException("Revise los datos ingresados.");
+
+        // Los bienes sin serie comparten el valor convencional S/N.
+        if (!numeroSerie.esSinSerie() && equipos.existeNumeroSerie(numeroSerie.valor(), idActual)) {
+            errores.agregar("numeroSerie", "Ya existe un bien registrado con ese numero de serie.");
+        }
+        if (equipos.existeCodigoInventario(inventario.valor(), idActual)) {
+            errores.agregar("codigoInventario", "Ya existe un bien con ese codigo de inventario.");
+        }
+        if (equipos.existeCodigoPatrimonial(patrimonial.valor(), idActual)) {
+            errores.agregar("codigoPatrimonial", "Ya existe un bien con ese codigo patrimonial.");
+        }
+        if (errores.tieneErrores()) {
+            throw errores;
+        }
+    }
+
+    private ReferenciaCategoria resolverCategoria(Long categoriaId, ReferenciaCategoria actual) {
+        if (categoriaId == null) {
+            throw new DatosInvalidosException("categoriaId", "Seleccione la categoria del bien.");
+        }
+        Categoria categoria = categorias.buscarPorId(categoriaId)
+                .orElseThrow(() -> RecursoNoEncontradoException.de("la categoria", categoriaId));
+
+        boolean yaLaTenia = actual != null && categoriaId.equals(actual.id());
+        if (!categoria.isActiva() && !yaLaTenia) {
+            throw new DatosInvalidosException("categoriaId", "La categoria seleccionada esta desactivada.");
+        }
+        return categoria.referencia();
+    }
+
+    /** RN-12: el laboratorio, si se indica, es de la misma Coordinacion. */
+    private Long resolverLaboratorio(Long laboratorioId, Long coordinacionId) {
+        if (laboratorioId == null) {
+            return null;
+        }
+        if (!ubicaciones.laboratorioPerteneceA(laboratorioId, coordinacionId)) {
+            throw new DatosInvalidosException("laboratorioId",
+                    "El laboratorio seleccionado no existe, esta desactivado o pertenece a otra coordinacion.");
+        }
+        return laboratorioId;
+    }
+}

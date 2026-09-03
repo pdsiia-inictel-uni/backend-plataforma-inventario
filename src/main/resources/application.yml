@@ -1,0 +1,216 @@
+# =============================================================================
+# Sistema de Gestion de Inventarios - INICTEL-UNI
+# Configuracion COMUN a todos los entornos.
+#
+# Este archivo describe COMO se llama cada ajuste; los VALORES viven en los
+# archivos de entorno, que no se versionan (RNF-45):
+#
+#     perfil 'dev'   ->  backend/.env          (por defecto)
+#     perfil 'prod'  ->  backend/.env.prod
+#     plantilla      ->  backend/.env.example  (el unico versionado)
+#
+# REGLA DE NOMBRES: la variable es la ruta de la propiedad en MAYUSCULAS con
+# guiones bajos (spring.datasource.url -> SPRING_DATASOURCE_URL). Son los
+# mismos nombres que Spring Boot, Docker y Kubernetes entienden de forma
+# nativa, de modo que una variable real del sistema operativo sustituye a la
+# del archivo sin cambiar una linea de aqui.
+#
+# Lo que NO lleva variable esta asi a proposito: son decisiones de diseno del
+# sistema, no ajustes de entorno (el limite de 5 MB de las fotografias pactado
+# en RF-51e, la ruta publica /api/archivos, Flyway como unico dueno del
+# esquema).
+# =============================================================================
+
+spring:
+  application:
+    name: inventario-inictel-uni
+
+  # ===== 1. PERFIL ACTIVO ====================================================
+  # 'dev' por defecto: en local no hay que declarar nada. En el servidor se
+  # impone con la variable real SPRING_PROFILES_ACTIVE=prod, que tiene
+  # prioridad sobre este valor. Cada perfil carga su propio archivo de entorno.
+  profiles:
+    active: dev
+
+  # ===== 3. BASE DE DATOS (PostgreSQL 16+) ===================================
+  # Sin valores de respaldo: si falta la configuracion, el arranque se detiene
+  # y el error muestra la variable sin resolver, en lugar de conectarse en
+  # silencio a una base equivocada con una contrasena de ejemplo.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # RNF-11, RNF-15: 300 usuarios concurrentes no necesitan 300 conexiones.
+      # Las peticiones son cortas y la mayoria son lecturas paginadas; un pool
+      # de 50 las atiende con holgura sin agotar los 100 slots por defecto de
+      # PostgreSQL. Subirlo mas degrada, no mejora: el cuello pasa a ser la BD.
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:50}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:10}
+      connection-timeout: 10000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 30000
+      pool-name: InventarioPool
+
+  # ===== 4. JPA / HIBERNATE ==================================================
+  jpa:
+    open-in-view: false
+    hibernate:
+      # El esquema lo administra Flyway (RNF-43). Hibernate solo valida.
+      # Deliberadamente no configurable por entorno: un 'update' accidental en
+      # desarrollo dejaria el esquema fuera de sincronia con las migraciones.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: America/Lima
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        # RNF-16: evita el problema N+1 en los listados paginados.
+        default_batch_fetch_size: 50
+        query:
+          in_clause_parameter_padding: true
+          fail_on_pagination_over_collection_fetch: true
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+
+  # ===== 5. FLYWAY (RNF-43) ==================================================
+  # Siempre activo: es el unico dueno del esquema, en todos los entornos.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+  # ===== 9. ARCHIVOS: limite de subida =======================================
+  # RF-51e: los 5 MB son el limite pactado y el frontend valida el mismo numero
+  # antes de enviar. No es un ajuste de entorno.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  mvc:
+    problemdetails:
+      enabled: false
+    # RNF-34: una ruta de API inexistente debe llegar al manejador de errores
+    # y responder 404 en el formato del sistema, no en la pagina por defecto.
+    throw-exception-if-no-handler-found: true
+
+  threads:
+    virtual:
+      # RNF-11: hilos virtuales de Java 21. Cada peticion toma el suyo y las
+      # esperas de base de datos dejan de bloquear hilos del sistema operativo,
+      # que es lo que permite sostener 300 usuarios concurrentes con holgura.
+      enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:true}
+
+# ===== 2. SERVIDOR HTTP ======================================================
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
+    whitelabel:
+      enabled: false
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain,text/css,application/javascript
+    min-response-size: 1024
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:400}
+      min-spare: 25
+    accept-count: 200
+    max-connections: 10000
+    connection-timeout: 20000
+
+# =============================================================================
+# Configuracion propia de la aplicacion (RNF-45).
+# Se enlaza con el record AppProperties, prefijo 'app'.
+# =============================================================================
+app:
+
+  # ===== 6. JWT (RF-02, RNF-02) ==============================================
+  # Sin valor de respaldo: una clave de desarrollo escrita en el codigo fuente
+  # es una llave maestra publicada. Si falta, la aplicacion no arranca.
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    # RF-02: expiracion configurable, por defecto 60 minutos.
+    expiracion-minutos: ${APP_JWT_EXPIRACION_MINUTOS:60}
+    emisor: inictel-uni-inventario
+
+  # ===== 7. SEGURIDAD DE ACCESO (RF-08, RNF-05) ==============================
+  seguridad:
+    max-intentos-fallidos: ${APP_SEGURIDAD_MAX_INTENTOS_FALLIDOS:5}
+    minutos-bloqueo: ${APP_SEGURIDAD_MINUTOS_BLOQUEO:15}
+
+  # ===== 8. CUENTA ADMINISTRADORA INICIAL (RF-06b) ===========================
+  # Se crea sola si la tabla usuario esta vacia, y obliga a completar identidad
+  # y contrasena en el primer ingreso. La contrasena no lleva respaldo: es una
+  # credencial, y ha de decidirla quien despliega.
+  cuenta-inicial:
+    habilitada: ${APP_CUENTA_INICIAL_HABILITADA:true}
+    username: ${APP_CUENTA_INICIAL_USERNAME:admin}
+    password: ${APP_CUENTA_INICIAL_PASSWORD}
+    correo: ${APP_CUENTA_INICIAL_CORREO:admin@inictel-uni.edu.pe}
+    dni: ${APP_CUENTA_INICIAL_DNI:00000000}
+
+  # ===== 9. CORS (RNF-10) ====================================================
+  cors:
+    origenes-permitidos: ${APP_CORS_ORIGENES_PERMITIDOS:http://localhost:4200}
+
+  # ===== 10. ARCHIVOS: fotografias de los bienes (RF-51) =====================
+  # 'url-publica' es parte del contrato de la API (ArchivoController) y de las
+  # rutas ya guardadas en equipo.foto_url: no se configura por entorno.
+  archivos:
+    directorio: ${APP_ARCHIVOS_DIRECTORIO:./uploads}
+    url-publica: /api/archivos
+
+# ===== 11. DOCUMENTACION OPENAPI / SWAGGER (RNF-08) ==========================
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+
+# ===== 12. REGISTRO DE ACTIVIDAD =============================================
+# Los niveles son propios de cada entorno y viven en application-dev.yml y
+# application-prod.yml. Estos son el minimo comun por si no hubiera perfil.
+logging:
+  level:
+    root: INFO
+    inictel.edu.pe: INFO
+    org.hibernate.SQL: WARN
+
+# ===== 13. SONDAS DE ESTADO (RNF-19, RNF-44) =================================
+# Solo 'health', y sin detalle: la sonda del contenedor necesita saber si la
+# aplicacion responde, no publicar la version de la base de datos ni el estado
+# del pool a quien pregunte. /actuator/health ya era ruta publica en
+# SeguridadConfig; esto es lo que la hace existir.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
