@@ -176,7 +176,13 @@ public class SeguridadConfig {
                         .requestMatchers(HttpMethod.POST, "/api/categorias/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/categorias/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/categorias/**").hasRole("ADMIN")
-                        // RN-09: los usuarios nunca se eliminan, solo se desactivan.
+                        // RF-28d: la baja de un PUESTO es el unico DELETE que admite
+                        // /api/usuarios, y no borra a nadie: retira la asignacion y deja
+                        // la cuenta activa. Va antes de la denegacion de abajo porque las
+                        // reglas se evaluan en orden y '/api/usuarios/**' la alcanzaria.
+                        // El rol y el ambito los comprueban @PreAuthorize y el servicio.
+                        .requestMatchers(HttpMethod.DELETE, "/api/usuarios/*/asignaciones/*").authenticated()
+                        // RN-09: los usuarios nunca se eliminan, solo se dan de baja.
                         .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**").denyAll()
                         // RN-21: el historial de un bien no admite escritura por ningun medio.
                         .requestMatchers(HttpMethod.DELETE, "/api/equipos/**").denyAll()
