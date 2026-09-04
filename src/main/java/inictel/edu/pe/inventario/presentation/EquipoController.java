@@ -194,16 +194,18 @@ public class EquipoController {
     }
 
     /**
-     * RF-51, RF-51c: adjunta o sustituye la fotografia del bien.
+     * RF-51, RF-51g: adjunta o sustituye la fotografia del bien.
      *
-     * <p>Exclusivo del Responsable desde la v3.10: sobre un bien ya registrado
-     * solo escribe el, y la fotografia es un dato del bien como cualquier otro
-     * (RF-45). El Operador la aporta al registrar el equipo, dentro del alta,
-     * que es cuando el bien todavia es suyo (RF-51b).</p>
+     * <p>El Responsable la pone y la sustituye siempre. El Operador solo la
+     * del alta: la del equipo que acaba de registrar el mismo, y mientras ese
+     * equipo no tenga ninguna (RF-51b, RF-51d). El rol se filtra aqui, pero
+     * las dos condiciones del Operador las comprueba el caso de uso, que es
+     * quien conoce el bien.</p>
      */
     @PostMapping(value = "/{id}/foto", consumes = "multipart/form-data")
-    @PreAuthorize("hasRole('RESPONSABLE')")
-    @Operation(summary = "Adjunta la fotografia del bien. Solo el responsable de su coordinacion (RF-51)")
+    @PreAuthorize("hasAnyRole('RESPONSABLE','OPERADOR')")
+    @Operation(summary = "Adjunta la fotografia del bien. El responsable siempre; el operador, la del "
+            + "equipo que acaba de registrar (RF-51)")
     public EquipoDto subirFoto(@PathVariable Long id, @RequestPart("archivo") MultipartFile archivo) {
         try {
             return inventario.asignarFoto(id, archivo.getOriginalFilename(),

@@ -429,11 +429,7 @@ public class GestionInventarioServicio {
     @Transactional
     public EquipoDto asignarFoto(Long id, String nombreOriginal, String tipoContenido, InputStream contenido) {
         Equipo equipo = exigirEquipo(id);
-        // RF-45, RF-51c: sobre un bien ya registrado solo escribe el Responsable,
-        // y la fotografia es un dato del bien como cualquier otro. Hasta la
-        // v3.10 la adjuntaba tambien el Operador desde la ficha, que era la
-        // unica escritura suya sobre un equipo existente.
-        exigirResponsableDe(equipo);
+        exigirQuienFotografia(equipo);
 
         String url = almacenFotos.guardar(nombreOriginal, tipoContenido, contenido);
         equipo.asignarFoto(url);
@@ -486,6 +482,39 @@ public class GestionInventarioServicio {
     private void exigirOperativoDe(Equipo equipo) {
         UsuarioAutenticado actual = exigirOperativo();
         actual.exigirAccesoA(equipo.getCoordinacionId());
+    }
+
+    /**
+     * RF-51g: quien puede adjuntar la fotografia de un bien.
+     *
+     * <p>El <b>Responsable</b> siempre: sobre los bienes de su Coordinacion
+     * escribe el, y la puede poner y sustituir cuantas veces quiera.</p>
+     *
+     * <p>El <b>Operador</b> solo la del alta: la del equipo que acaba de
+     * registrar el mismo y mientras ese equipo no tenga ninguna. El alta y su
+     * fotografia son dos llamadas seguidas porque el bien no puede recibir una
+     * imagen antes de existir (RF-51d), no dos operaciones distintas; abrir
+     * este endpoint al Operador sin las dos condiciones lo convertiria en la
+     * escritura sobre un bien ajeno que RF-45 le niega —podria sustituir la
+     * fotografia de cualquier equipo de la Coordinacion—.</p>
+     */
+    private void exigirQuienFotografia(Equipo equipo) {
+        UsuarioAutenticado actual = exigirOperativo();
+        actual.exigirAccesoA(equipo.getCoordinacionId());
+        if (actual.esResponsable()) {
+            return;
+        }
+        if (equipo.getFotoUrl() != null) {
+            throw new AccesoDenegadoException(
+                    "Este equipo ya tiene fotografia. Sustituirla corresponde al responsable de la "
+                            + "coordinacion.");
+        }
+        if (equipo.getUsuarioRegistroId() == null
+                || !equipo.getUsuarioRegistroId().equals(actual.id())) {
+            throw new AccesoDenegadoException(
+                    "Solo puede adjuntar la fotografia del equipo que usted mismo registro. En los "
+                            + "demas equipos la pone el responsable de la coordinacion.");
+        }
     }
 
     /** RF-45: editar, cambiar condicion y dar de baja son del Responsable. */
