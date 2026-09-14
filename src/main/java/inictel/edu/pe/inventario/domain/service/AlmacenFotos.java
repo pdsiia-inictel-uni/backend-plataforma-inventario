@@ -19,4 +19,15 @@ public interface AlmacenFotos {
      * @param contenido      flujo de bytes de la imagen
      */
     String guardar(String nombreOriginal, String tipoContenido, InputStream contenido);
+
+    /**
+     * Elimina la imagen identificada por la URL que devolvio {@link #guardar}.
+     *
+     * <p>Se usa al sustituir la fotografia de un bien (RF-51f): la anterior deja
+     * de estar referenciada y conservarla solo acumula archivos huerfanos. Una
+     * URL desconocida o un archivo que ya no existe no es un error.</p>
+     *
+     * @param url URL publica de la imagen a eliminar
+     */
+    void eliminar(String url);
 }

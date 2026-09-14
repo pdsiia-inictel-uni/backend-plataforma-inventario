@@ -30,6 +30,8 @@ import inictel.edu.pe.inventario.domain.service.DirectorioUsuarios;
 import inictel.edu.pe.inventario.domain.service.UbicacionesDisponibles;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.InputStream;
 import java.util.Comparator;
@@ -431,11 +433,36 @@ public class GestionInventarioServicio {
         Equipo equipo = exigirEquipo(id);
         exigirQuienFotografia(equipo);
 
+        String anterior = equipo.getFotoUrl();
         String url = almacenFotos.guardar(nombreOriginal, tipoContenido, contenido);
         equipo.asignarFoto(url);
         Equipo guardado = equipos.guardar(equipo);
 
+        if (anterior != null && !anterior.equals(url)) {
+            eliminarFotoSustituida(anterior);
+        }
+
         return componer(guardado);
+    }
+
+    /**
+     * RF-51f: la fotografia sustituida se elimina automaticamente.
+     *
+     * <p>Se borra solo cuando la transaccion confirma: si la actualizacion del
+     * bien se revierte, el registro sigue apuntando a la anterior y esta tiene
+     * que seguir existiendo.</p>
+     */
+    private void eliminarFotoSustituida(String url) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            almacenFotos.eliminar(url);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                almacenFotos.eliminar(url);
+            }
+        });
     }
 
     // ------------------------------------------------------------------

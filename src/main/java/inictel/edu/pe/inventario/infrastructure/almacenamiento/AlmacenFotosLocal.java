@@ -71,6 +71,34 @@ public class AlmacenFotosLocal implements AlmacenFotos {
         return urlPublica + "/" + nombre;
     }
 
+    /**
+     * Borra del disco la fotografia sustituida (RF-51f).
+     *
+     * <p>Solo actua sobre URLs emitidas por este almacen y dentro de su
+     * directorio. Un fallo al borrar se registra y no se propaga: la
+     * sustitucion ya quedo confirmada y un archivo huerfano no justifica
+     * devolverle un error al usuario.</p>
+     */
+    @Override
+    public void eliminar(String url) {
+        String prefijo = urlPublica + "/";
+        if (url == null || !url.startsWith(prefijo)) {
+            return;
+        }
+        String nombre = url.substring(prefijo.length());
+        Path ruta = directorio.resolve(nombre).normalize();
+        if (nombre.isBlank() || !ruta.startsWith(directorio) || ruta.equals(directorio)) {
+            return;
+        }
+        try {
+            if (Files.deleteIfExists(ruta)) {
+                log.info("Fotografia sustituida eliminada: {}", nombre);
+            }
+        } catch (IOException ex) {
+            log.warn("No se pudo eliminar la fotografia sustituida {}: {}", nombre, ex.getMessage());
+        }
+    }
+
     /** Ruta fisica de una fotografia ya almacenada, para servirla. */
     public Path resolver(String nombre) {
         Path ruta = directorio.resolve(nombre).normalize();
