@@ -161,22 +161,33 @@ public class ServicioPublicoInventario {
             equipo.devolverAlResponsableDeCoordinacion();
             Equipo guardado = equipos.guardar(equipo);
             registrarMovimiento(guardado, TipoMovimiento.RESPONSABLE, guardado.getCondicion(),
-                    "El equipo queda a cargo del responsable de la coordinacion.");
+                    "El equipo queda a cargo del responsable de la coordinación.");
         }
     }
 
     // ------------------------------------------------------------------
-    // Cifras (RF-13, RF-15, RF-75 .. RF-77)
+    // Cifras (RF-14, RF-15, RF-75 .. RF-77)
     // ------------------------------------------------------------------
 
+    /**
+     * RF-14: bienes ubicados en un laboratorio, por condicion.
+     *
+     * <p>Lo consulta {@code organizacion} antes de desactivarlo: solo se
+     * desactiva cuando todos los que quedan dentro estan dados de baja.</p>
+     */
     @Transactional(readOnly = true)
-    public long contarActivosEnCoordinacion(Long coordinacionId) {
-        return equipos.contarActivosEnCoordinacion(coordinacionId);
+    public BienesEnLaboratorioDto bienesEnLaboratorio(Long laboratorioId) {
+        Map<CondicionEquipo, Long> conteo = equipos.contarPorCondicionEnLaboratorio(laboratorioId);
+        return new BienesEnLaboratorioDto(
+                conteo.getOrDefault(CondicionEquipo.OPERATIVO, 0L),
+                conteo.getOrDefault(CondicionEquipo.PRESTADO, 0L),
+                conteo.getOrDefault(CondicionEquipo.MANTENIMIENTO, 0L),
+                conteo.getOrDefault(CondicionEquipo.BAJA, 0L));
     }
 
-    @Transactional(readOnly = true)
-    public long contarEnLaboratorio(Long laboratorioId) {
-        return equipos.contarEnLaboratorio(laboratorioId);
+    /** Bienes de un laboratorio por condicion (RF-14). */
+    public record BienesEnLaboratorioDto(long operativos, long prestados, long enMantenimiento,
+                                         long dadosDeBaja) {
     }
 
     /**

@@ -8,6 +8,6 @@ package inictel.edu.pe.iam.domain.excepcion;
 public class CambioPasswordRequeridoException extends RuntimeException {
 
     public CambioPasswordRequeridoException() {
-        super("Debe cambiar su contrasena antes de continuar usando el sistema.");
+        super("Debe cambiar su contraseña antes de continuar usando el sistema.");
     }
 }

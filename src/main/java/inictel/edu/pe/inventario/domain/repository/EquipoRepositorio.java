@@ -68,12 +68,11 @@ public interface EquipoRepositorio {
     }
 
     // ------------------------------------------------------------------
-    // Consultas de apoyo a organizacion (RF-13, RF-14, RF-15)
+    // Consultas de apoyo a organizacion (RF-14)
     // ------------------------------------------------------------------
 
-    long contarActivosEnCoordinacion(Long coordinacionId);
-
-    long contarEnLaboratorio(Long laboratorioId);
+    /** RF-14: bienes ubicados en un laboratorio, por condicion, dados de baja incluidos. */
+    Map<CondicionEquipo, Long> contarPorCondicionEnLaboratorio(Long laboratorioId);
 
     // ------------------------------------------------------------------
     // Consultas para el panel de control (RF-75 .. RF-77)

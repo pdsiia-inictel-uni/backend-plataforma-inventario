@@ -101,7 +101,7 @@ public class GestionUsuariosServicio {
     public List<UsuarioDto> listarIntegrantes(Long coordinacionId, boolean soloActivos) {
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.puedeLeerCoordinacion(coordinacionId)) {
-            throw new AccesoDenegadoException("No tiene acceso al personal de otra coordinacion.");
+            throw new AccesoDenegadoException("No tiene acceso al personal de otra coordinación.");
         }
         return usuarios.listarPorCoordinacion(coordinacionId, soloActivos).stream()
                 .map(this::componer)
@@ -334,7 +334,7 @@ public class GestionUsuariosServicio {
     public UsuarioDto retirarDe(Long usuarioId, Long coordinacionId) {
         Usuario usuario = exigirUsuario(usuarioId);
         exigirPermisoDeBaja(usuario, coordinacionId);
-        exigirQueNoTengaBienesACargo(usuario, "retirarlo de su coordinacion");
+        exigirQueNoTengaBienesACargo(usuario, "retirarlo de su coordinación");
 
         usuario.retirarDe(coordinacionId);
 
@@ -414,7 +414,7 @@ public class GestionUsuariosServicio {
      */
     @Transactional
     public AsignacionRealizadaDto cambiarResponsable(Long coordinacionId, Long nuevoResponsableId) {
-        exigirAdministrador("Solo el Administrador cambia el responsable de una coordinacion.");
+        exigirAdministrador("Solo el Administrador cambia el responsable de una coordinación.");
         validarCoordinacionUtilizable(coordinacionId);
 
         Usuario entrante = exigirUsuario(nuevoResponsableId);
@@ -431,7 +431,7 @@ public class GestionUsuariosServicio {
         if (saliente != null) {
             if (saliente.getId().equals(entrante.getId())) {
                 throw new ReglaNegocioException(
-                        "'" + saliente.nombreCompleto() + "' ya es el responsable de esa coordinacion.");
+                        "'" + saliente.nombreCompleto() + "' ya es el responsable de esa coordinación.");
             }
             saliente.liberarPuesto();
             usuarios.guardar(saliente);
@@ -463,7 +463,7 @@ public class GestionUsuariosServicio {
     /** RF-26b: quienes pueden tomar el puesto, para que se elija entre ellos. */
     @Transactional(readOnly = true)
     public List<UsuarioDto> candidatosAResponsable(Long coordinacionId) {
-        exigirAdministrador("Solo el Administrador cambia el responsable de una coordinacion.");
+        exigirAdministrador("Solo el Administrador cambia el responsable de una coordinación.");
         return usuarios.candidatosAResponsableDe(coordinacionId).stream()
                 .map(this::componer)
                 .toList();
@@ -480,13 +480,13 @@ public class GestionUsuariosServicio {
         if (!entrante.estaActiva()) {
             throw new ReglaNegocioException(
                     "'" + entrante.nombreCompleto() + "' no tiene la cuenta activa, asi que no puede "
-                            + "hacerse cargo de una coordinacion.");
+                            + "hacerse cargo de una coordinación.");
         }
         if (entrante.esResponsable()) {
             throw new ReglaNegocioException(
                     "'" + entrante.nombreCompleto() + "' ya es responsable de "
                             + coordinacionesDe(entrante) + ". Nadie responde por dos inventarios: "
-                            + "cambie primero el responsable de aquella coordinacion.");
+                            + "cambie primero el responsable de aquella coordinación.");
         }
         if (entrante.esOperador() && !entrante.perteneceA(coordinacionId)) {
             throw new ReglaNegocioException(
@@ -506,8 +506,8 @@ public class GestionUsuariosServicio {
         exigirPermisoDeGestion(usuario);
         if (usuario.estaSinAsignar()) {
             throw new ReglaNegocioException(
-                    "'" + usuario.nombreCompleto() + "' todavia no tiene un puesto asignado, asi que "
-                            + "aun no puede entrar al sistema. Su contrasena nacera al asignarlo.");
+                    "'" + usuario.nombreCompleto() + "' todavía no tiene un puesto asignado, asi que "
+                            + "aun no puede entrar al sistema. Su contraseña nacera al asignarlo.");
         }
 
         String temporal = GeneradorPasswordTemporal.generar();
@@ -573,9 +573,9 @@ public class GestionUsuariosServicio {
                             + "se asigna a quien esta registrado sin ninguno.");
         }
         String donde = usuario.esResponsable()
-                ? "Dele de baja del puesto desde la ficha de su coordinacion, en Direcciones, y "
-                        + "despues asignele el nuevo."
-                : "Dele de baja del puesto en esta misma ventana y despues asignele el nuevo.";
+                ? "Dele de baja del puesto desde la ficha de su coordinación, en Direcciones, y "
+                        + "después asignele el nuevo."
+                : "Dele de baja del puesto en esta misma ventana y después asignele el nuevo.";
         throw new ReglaNegocioException(
                 "'" + usuario.nombreCompleto() + "' ya es " + etiqueta(usuario.getRol()) + " de "
                         + coordinacionesDe(usuario) + ". " + donde);
@@ -599,12 +599,12 @@ public class GestionUsuariosServicio {
         Usuario ocupante = vigente.get();
         if (ocupante.getId().equals(entrante.getId())) {
             throw new ReglaNegocioException(
-                    "'" + ocupante.nombreCompleto() + "' ya es el responsable de esa coordinacion.");
+                    "'" + ocupante.nombreCompleto() + "' ya es el responsable de esa coordinación.");
         }
         throw new ReglaNegocioException(
                 nombreCoordinacionODefecto(coordinacionId) + " ya tiene responsable: '"
                         + ocupante.nombreCompleto() + "'. Dele de baja del puesto en la pantalla de "
-                        + "Direcciones y despues nombre a quien lo sucede.");
+                        + "Direcciones y después nombre a quien lo sucede.");
     }
 
     private UsuarioDto componer(Usuario usuario) {
@@ -626,7 +626,7 @@ public class GestionUsuariosServicio {
 
     private String nombreCoordinacionODefecto(Long coordinacionId) {
         String nombre = nombreCoordinacion(coordinacionId);
-        return nombre == null ? "su coordinacion" : "la coordinacion '" + nombre + "'";
+        return nombre == null ? "su coordinación" : "la coordinación '" + nombre + "'";
     }
 
     /** Las coordinaciones de una persona, nombradas, para las frases de aviso. */
@@ -635,7 +635,7 @@ public class GestionUsuariosServicio {
                 .map(this::nombreCoordinacion)
                 .filter(nombre -> nombre != null)
                 .toList();
-        return nombres.isEmpty() ? "su coordinacion" : "'" + String.join("', '", nombres) + "'";
+        return nombres.isEmpty() ? "su coordinación" : "'" + String.join("', '", nombres) + "'";
     }
 
     /** RN-23: el Responsable solo ve a su propia gente. */
@@ -652,7 +652,7 @@ public class GestionUsuariosServicio {
         boolean compartenCoordinacion = usuario.getCoordinaciones().stream()
                 .anyMatch(actual::puedeLeerCoordinacion);
         if (!compartenCoordinacion) {
-            throw new AccesoDenegadoException("No tiene acceso a los datos de otra coordinacion.");
+            throw new AccesoDenegadoException("No tiene acceso a los datos de otra coordinación.");
         }
     }
 
@@ -711,7 +711,7 @@ public class GestionUsuariosServicio {
         }
         if (!objetivo.esOperador()) {
             throw new AccesoDenegadoException(
-                    "Solo el administrador da de baja a un responsable de su coordinacion.");
+                    "Solo el administrador da de baja a un responsable de su coordinación.");
         }
         actual.exigirAccesoA(coordinacionId);
     }
@@ -728,7 +728,7 @@ public class GestionUsuariosServicio {
         boolean suyo = objetivo.getCoordinaciones().stream().anyMatch(actual::puedeLeerCoordinacion);
         if (!objetivo.esOperador() || !suyo) {
             throw new AccesoDenegadoException(
-                    "Solo puede gestionar a los operadores de su coordinacion.");
+                    "Solo puede gestionar a los operadores de su coordinación.");
         }
     }
 
@@ -758,11 +758,11 @@ public class GestionUsuariosServicio {
     private void validarCoordinacionUtilizable(Long coordinacionId) {
         if (coordinacionId == null) {
             throw new DatosInvalidosException("coordinacionId",
-                    "Seleccione la coordinacion del puesto.");
+                    "Seleccione la coordinación del puesto.");
         }
-        if (!estructura.existeCoordinacionActiva(coordinacionId)) {
+        if (!estructura.existeCoordinacion(coordinacionId)) {
             throw new DatosInvalidosException("coordinacionId",
-                    "La coordinacion seleccionada no existe o esta desactivada.");
+                    "La coordinación seleccionada no existe o esta desactivada.");
         }
     }
 
@@ -781,9 +781,9 @@ public class GestionUsuariosServicio {
         }
         if (usuarios.contarAdministradoresActivos() <= 1) {
             throw new ReglaNegocioException(
-                    "'" + usuario.nombreCompleto() + "' es el unico Administrador activo del sistema. "
+                    "'" + usuario.nombreCompleto() + "' es el único Administrador activo del sistema. "
                             + "Nombre a otro antes, porque sin ninguno no habria quien reparta los "
-                            + "puestos ni quien organice la institucion.");
+                            + "puestos ni quien organice la institución.");
         }
     }
 
@@ -812,9 +812,9 @@ public class GestionUsuariosServicio {
                         + (cuantos == 1 ? " equipo a su cargo" : " equipos a su cargo")
                         + ", asi que no se puede " + queSeIbaAHacer + " todavia: "
                         + nombrar(aCargo) + ". "
-                        + "Desde la ficha de cada equipo, el responsable de la coordinacion debe "
-                        + "entregarselos a otro operador de la misma coordinacion o quedarselos el. "
-                        + "Cuando no le quede ninguno, la baja se podra completar.");
+                        + "Desde la ficha de cada equipo, el responsable de la coordinación debe "
+                        + "entregarselos a otro operador de la misma coordinación o quedarselos el. "
+                        + "Cuando no le quede ninguno, la baja se podrá completar.");
     }
 
     /**

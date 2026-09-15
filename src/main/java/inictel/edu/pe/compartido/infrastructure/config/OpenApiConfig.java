@@ -22,7 +22,7 @@ public class OpenApiConfig {
     public OpenAPI apiInventario() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("API - Sistema de Gestion de Inventarios INICTEL-UNI")
+                        .title("API - Sistema de Gestión de Inventarios INICTEL-UNI")
                         .version("3.0")
                         .description("""
                                 API REST del Sistema de Gestion de Inventarios de INICTEL-UNI, organizada por contextos delimitados (DDD):

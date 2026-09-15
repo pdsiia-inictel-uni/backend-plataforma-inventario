@@ -1,18 +1,16 @@
 package inictel.edu.pe.iam.application.service;
 
 import inictel.edu.pe.compartido.domain.excepcion.DatosInvalidosException;
+import inictel.edu.pe.compartido.domain.excepcion.ReglaNegocioException;
 import inictel.edu.pe.iam.application.comando.AutenticarComando;
-import inictel.edu.pe.iam.application.comando.CambiarCredencialesComando;
 import inictel.edu.pe.iam.application.comando.CambiarPasswordComando;
 import inictel.edu.pe.iam.application.comando.CompletarPrimerIngresoComando;
 import inictel.edu.pe.iam.application.dto.SesionDto;
 import inictel.edu.pe.iam.application.dto.UsuarioDto;
 import inictel.edu.pe.iam.application.port.GeneradorTokens;
 import inictel.edu.pe.iam.application.port.ParametrosSeguridad;
-import inictel.edu.pe.iam.domain.model.CorreoInstitucional;
 import inictel.edu.pe.iam.domain.model.Dni;
 import inictel.edu.pe.iam.domain.model.NombrePersona;
-import inictel.edu.pe.iam.domain.model.NombreUsuario;
 import inictel.edu.pe.iam.domain.model.Usuario;
 import inictel.edu.pe.iam.domain.repository.UsuarioRepositorio;
 import inictel.edu.pe.iam.domain.service.CifradorPassword;
@@ -37,7 +35,7 @@ import java.util.Optional;
 public class AutenticacionServicio {
 
     private static final Logger log = LoggerFactory.getLogger(AutenticacionServicio.class);
-    private static final String MENSAJE_CREDENCIALES = "Usuario o contrasena incorrectos.";
+    private static final String MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos.";
 
     /** RF-07: mensaje literal exigido por la especificacion. */
     private static final String MENSAJE_CUENTA_INACTIVA =
@@ -115,17 +113,23 @@ public class AutenticacionServicio {
     public SesionDto cambiarPasswordPropia(CambiarPasswordComando comando) {
         Usuario usuario = exigirUsuario(comando.usuarioId());
 
+        // RF-06b: la cuenta inicial no puede estrenar contrasena dejando su
+        // identidad de relleno; para ella el camino es el primer ingreso.
+        if (usuario.debeCompletarIdentidad()) {
+            throw new ReglaNegocioException(
+                    "Antes de cambiar la contraseña debe registrar sus nombres, apellidos y DNI.");
+        }
         if (!cifrador.coincide(comando.passwordActual(), usuario.getPasswordHash())) {
-            throw new DatosInvalidosException("passwordActual", "La contrasena actual no es correcta.");
+            throw new DatosInvalidosException("passwordActual", "La contraseña actual no es correcta.");
         }
         if (!comando.passwordNueva().equals(comando.confirmacion())) {
-            throw new DatosInvalidosException("confirmacion", "La confirmacion no coincide con la nueva contrasena.");
+            throw new DatosInvalidosException("confirmacion", "La confirmacion no coincide con la nueva contraseña.");
         }
         if (!PoliticaPassword.esValida(comando.passwordNueva())) {
             throw new DatosInvalidosException("passwordNueva", PoliticaPassword.MENSAJE);
         }
         if (cifrador.coincide(comando.passwordNueva(), usuario.getPasswordHash())) {
-            throw new DatosInvalidosException("passwordNueva", "La nueva contrasena debe ser distinta de la actual.");
+            throw new DatosInvalidosException("passwordNueva", "La nueva contraseña debe ser distinta de la actual.");
         }
 
         usuario.cambiarPassword(cifrador.cifrar(comando.passwordNueva()));
@@ -146,17 +150,23 @@ public class AutenticacionServicio {
     public SesionDto completarPrimerIngreso(CompletarPrimerIngresoComando comando) {
         Usuario usuario = exigirUsuario(comando.usuarioId());
 
+        // RF-06b: solo la cuenta inicial, que nace con datos de relleno, declara
+        // su identidad. Un Administrador dado de alta por otro ya tiene la suya.
+        if (!usuario.debeCompletarIdentidad()) {
+            throw new ReglaNegocioException(
+                    "Sus datos personales ya están registrados. Solo tiene que cambiar su contraseña.");
+        }
         if (!cifrador.coincide(comando.passwordActual(), usuario.getPasswordHash())) {
-            throw new DatosInvalidosException("passwordActual", "La contrasena actual no es correcta.");
+            throw new DatosInvalidosException("passwordActual", "La contraseña actual no es correcta.");
         }
         if (!comando.passwordNueva().equals(comando.confirmacion())) {
-            throw new DatosInvalidosException("confirmacion", "La confirmacion no coincide con la nueva contrasena.");
+            throw new DatosInvalidosException("confirmacion", "La confirmacion no coincide con la nueva contraseña.");
         }
         if (!PoliticaPassword.esValida(comando.passwordNueva())) {
             throw new DatosInvalidosException("passwordNueva", PoliticaPassword.MENSAJE);
         }
         if (cifrador.coincide(comando.passwordNueva(), usuario.getPasswordHash())) {
-            throw new DatosInvalidosException("passwordNueva", "La nueva contrasena debe ser distinta de la actual.");
+            throw new DatosInvalidosException("passwordNueva", "La nueva contraseña debe ser distinta de la actual.");
         }
 
         NombrePersona nombre = new NombrePersona(
@@ -169,35 +179,6 @@ public class AutenticacionServicio {
         }
 
         usuario.completarPrimerIngreso(nombre, dni, cifrador.cifrar(comando.passwordNueva()));
-        usuarios.guardar(usuario);
-
-        return construirSesion(usuario);
-    }
-
-    /** Cambio del propio nombre de usuario y correo, confirmado con la contrasena vigente. */
-    @Transactional
-    public SesionDto cambiarCredencialesPropias(CambiarCredencialesComando comando) {
-        Usuario usuario = exigirUsuario(comando.usuarioId());
-
-        if (!cifrador.coincide(comando.passwordActual(), usuario.getPasswordHash())) {
-            throw new DatosInvalidosException("passwordActual", "La contrasena actual no es correcta.");
-        }
-
-        NombreUsuario nuevoUsername = new NombreUsuario(comando.username());
-        CorreoInstitucional nuevoCorreo = new CorreoInstitucional(comando.correo());
-
-        DatosInvalidosException errores = new DatosInvalidosException("Revise los datos ingresados.");
-        if (usuarios.existeUsername(nuevoUsername.valor(), usuario.getId())) {
-            errores.agregar("username", "El nombre de usuario ya esta en uso.");
-        }
-        if (usuarios.existeCorreo(nuevoCorreo.valor(), usuario.getId())) {
-            errores.agregar("correo", "El correo institucional ya esta registrado.");
-        }
-        if (errores.tieneErrores()) {
-            throw errores;
-        }
-
-        usuario.actualizarCredencialesPropias(nuevoUsername, nuevoCorreo);
         usuarios.guardar(usuario);
 
         return construirSesion(usuario);

@@ -81,13 +81,13 @@ public class GestionCategoriasServicio {
 
     private Categoria exigirCategoria(Long id) {
         return categorias.buscarPorId(id)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("la categoria", id));
+                .orElseThrow(() -> RecursoNoEncontradoException.de("la categoría", id));
     }
 
     private void validarNombreUnico(String nombre, Long idActual) {
         String limpio = nombre == null ? "" : nombre.trim();
         if (!limpio.isEmpty() && categorias.existeNombre(limpio, idActual)) {
-            throw new DatosInvalidosException("nombre", "Ya existe una categoria con ese nombre.");
+            throw new DatosInvalidosException("nombre", "Ya existe una categoría con ese nombre.");
         }
     }
 }

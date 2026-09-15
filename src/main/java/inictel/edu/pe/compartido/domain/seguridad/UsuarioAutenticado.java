@@ -48,7 +48,7 @@ public record UsuarioAutenticado(
     public Long coordinacionRequerida() {
         if (coordinacion == null) {
             throw new AccesoDenegadoException(
-                    "Esta operacion pertenece a una coordinacion y su cuenta no tiene ninguna asignada.");
+                    "Esta operación pertenece a una coordinación y su cuenta no tiene ninguna asignada.");
         }
         return coordinacion;
     }
@@ -63,7 +63,7 @@ public record UsuarioAutenticado(
     public void exigirAccesoA(Long objetivo) {
         if (objetivo == null || !objetivo.equals(coordinacion)) {
             throw new AccesoDenegadoException(
-                    "No tiene acceso a los datos de otra coordinacion.");
+                    "No tiene acceso a los datos de otra coordinación.");
         }
     }
 

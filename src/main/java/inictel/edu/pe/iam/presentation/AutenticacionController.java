@@ -5,7 +5,6 @@ import inictel.edu.pe.iam.application.dto.SesionDto;
 import inictel.edu.pe.iam.application.dto.UsuarioDto;
 import inictel.edu.pe.iam.application.service.AutenticacionServicio;
 import inictel.edu.pe.iam.presentation.dto.CambioPasswordRequest;
-import inictel.edu.pe.iam.presentation.dto.CambioUsuarioRequest;
 import inictel.edu.pe.iam.presentation.dto.LoginRequest;
 import inictel.edu.pe.iam.presentation.dto.PrimerIngresoRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -52,7 +50,7 @@ public class AutenticacionController {
     public ResponseEntity<Map<String, String>> logout() {
         // El token es sin estado: cerrarlo es descartarlo en el cliente. La
         // llamada existe para que el frontend tenga un punto unico de cierre.
-        return ResponseEntity.ok(Map.of("mensaje", "Sesion cerrada correctamente."));
+        return ResponseEntity.ok(Map.of("mensaje", "Sesión cerrada correctamente."));
     }
 
     @GetMapping("/me")
@@ -79,10 +77,8 @@ public class AutenticacionController {
                 autenticacion.completarPrimerIngreso(peticion.aComando(contexto.requerido().id())));
     }
 
-    @PutMapping("/mi-usuario")
-    @Operation(summary = "Cambia el propio nombre de usuario y correo institucional")
-    public ResponseEntity<SesionDto> cambiarUsuario(@Valid @RequestBody CambioUsuarioRequest peticion) {
-        return ResponseEntity.ok(
-                autenticacion.cambiarCredencialesPropias(peticion.aComando(contexto.requerido().id())));
-    }
+    // RF-21c: no hay endpoint para cambiar el propio nombre de usuario ni el
+    // correo institucional. Son datos de la cuenta, como el nombre y el DNI, y
+    // los modifica quien la gestiona: el Administrador, o el Responsable si la
+    // cuenta es de uno de sus operadores (PUT /api/usuarios/{id}).
 }

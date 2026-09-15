@@ -18,24 +18,13 @@ final class OrganizacionMapper {
     // ------------------------------------------------------------------
 
     static Direccion aDominio(DireccionJpaEntity entidad) {
-        return Direccion.reconstituir(
-                entidad.getId(),
-                entidad.getNombre(),
-                entidad.getSigla(),
-                entidad.getDescripcion(),
-                entidad.isActiva(),
-                entidad.getFechaCreacion(),
-                entidad.getFechaActualizacion());
+        return Direccion.reconstituir(entidad.getId(), entidad.getNombre(), entidad.getSigla());
     }
 
     static DireccionJpaEntity aEntidad(Direccion direccion, DireccionJpaEntity existente) {
         DireccionJpaEntity entidad = existente != null ? existente : new DireccionJpaEntity();
         entidad.setNombre(direccion.getNombre());
         entidad.setSigla(direccion.getSigla());
-        entidad.setDescripcion(direccion.getDescripcion());
-        entidad.setActiva(direccion.isActiva());
-        entidad.setFechaCreacion(direccion.getFechaCreacion());
-        entidad.setFechaActualizacion(direccion.getFechaActualizacion());
         return entidad;
     }
 
@@ -48,10 +37,7 @@ final class OrganizacionMapper {
                 entidad.getId(),
                 entidad.getDireccionId(),
                 entidad.getNombre(),
-                entidad.getDescripcion(),
-                entidad.isActiva(),
-                entidad.getFechaCreacion(),
-                entidad.getFechaActualizacion());
+                entidad.getDescripcion());
     }
 
     static CoordinacionJpaEntity aEntidad(Coordinacion coordinacion, CoordinacionJpaEntity existente) {
@@ -59,9 +45,6 @@ final class OrganizacionMapper {
         entidad.setDireccionId(coordinacion.getDireccionId());
         entidad.setNombre(coordinacion.getNombre());
         entidad.setDescripcion(coordinacion.getDescripcion());
-        entidad.setActiva(coordinacion.isActiva());
-        entidad.setFechaCreacion(coordinacion.getFechaCreacion());
-        entidad.setFechaActualizacion(coordinacion.getFechaActualizacion());
         return entidad;
     }
 
@@ -74,10 +57,7 @@ final class OrganizacionMapper {
                 entidad.getId(),
                 entidad.getCoordinacionId(),
                 entidad.getNombre(),
-                entidad.getUbicacion(),
-                entidad.isActivo(),
-                entidad.getFechaCreacion(),
-                entidad.getFechaActualizacion());
+                entidad.getUbicacion());
     }
 
     static LaboratorioJpaEntity aEntidad(Laboratorio laboratorio, LaboratorioJpaEntity existente) {
@@ -85,9 +65,6 @@ final class OrganizacionMapper {
         entidad.setCoordinacionId(laboratorio.getCoordinacionId());
         entidad.setNombre(laboratorio.getNombre());
         entidad.setUbicacion(laboratorio.getUbicacion());
-        entidad.setActivo(laboratorio.isActivo());
-        entidad.setFechaCreacion(laboratorio.getFechaCreacion());
-        entidad.setFechaActualizacion(laboratorio.getFechaActualizacion());
         return entidad;
     }
 }

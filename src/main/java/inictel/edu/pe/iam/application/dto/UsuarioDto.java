@@ -32,6 +32,8 @@ public record UsuarioDto(
         EstadoCuenta estado,
         String estadoEtiqueta,
         boolean debeCambiarPassword,
+        /** RF-06b: solo la cuenta administradora inicial declara su identidad al estrenarse. */
+        boolean debeCompletarIdentidad,
         boolean bloqueado,
         LocalDateTime ultimoAcceso,
         LocalDateTime fechaCreacion) {
@@ -69,6 +71,7 @@ public record UsuarioDto(
                 u.getEstado(),
                 u.getEstado().getEtiqueta(),
                 u.isDebeCambiarPassword(),
+                u.debeCompletarIdentidad(),
                 u.estaBloqueado(),
                 u.getUltimoAcceso(),
                 u.getFechaCreacion());

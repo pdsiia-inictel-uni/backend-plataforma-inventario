@@ -10,8 +10,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
-
 /**
  * Representacion persistente de la coordinacion (tabla {@code coordinacion}).
  *
@@ -38,13 +36,4 @@ public class CoordinacionJpaEntity {
 
     @Column(name = "descripcion", length = 500)
     private String descripcion;
-
-    @Column(name = "activa", nullable = false)
-    private boolean activa = true;
-
-    @Column(name = "fecha_creacion", nullable = false)
-    private LocalDateTime fechaCreacion;
-
-    @Column(name = "fecha_actualizacion")
-    private LocalDateTime fechaActualizacion;
 }

@@ -28,7 +28,7 @@ public record UsuarioRequest(
         @NotBlank(message = "Ingrese el nombre de usuario.")
         @Size(min = 4, max = 50, message = "El nombre de usuario debe tener entre 4 y 50 caracteres.")
         @Pattern(regexp = "^[a-zA-Z0-9._-]+$",
-                message = "El nombre de usuario solo admite letras, numeros, punto, guion y guion bajo.")
+                message = "El nombre de usuario solo admite letras, números, punto, guion y guion bajo.")
         String username,
 
         @NotBlank(message = "Ingrese los nombres.")

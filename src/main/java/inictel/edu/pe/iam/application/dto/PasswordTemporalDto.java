@@ -13,6 +13,6 @@ public record PasswordTemporalDto(
 
     public static PasswordTemporalDto de(Long usuarioId, String username, String passwordTemporal) {
         return new PasswordTemporalDto(usuarioId, username, passwordTemporal,
-                "Entregue esta contrasena temporal al usuario. El sistema le exigira cambiarla en su proximo ingreso.");
+                "Entregue esta contraseña temporal al usuario. El sistema le exigira cambiarla en su proximo ingreso.");
     }
 }

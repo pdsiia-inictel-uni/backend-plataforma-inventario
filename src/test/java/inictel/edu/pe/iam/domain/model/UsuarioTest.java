@@ -35,6 +35,55 @@ class UsuarioTest {
         return usuario;
     }
 
+    private Usuario administradorInicial() {
+        return Usuario.registrarAdministradorInicial(
+                new NombreUsuario("admin"),
+                new Dni("00000000"),
+                new CorreoInstitucional("admin@inictel-uni.edu.pe"),
+                "$2a$10$hashficticio");
+    }
+
+    @Test
+    @DisplayName("RF-06b: la cuenta inicial declara su identidad en el primer ingreso")
+    void cuentaInicialDebeCompletarIdentidad() {
+        Usuario admin = administradorInicial();
+        assertTrue(admin.debeCompletarIdentidad());
+
+        admin.completarPrimerIngreso(new NombrePersona("Ana", "Diaz", "Vega"), new Dni("45871236"),
+                "$2a$10$otrohash");
+
+        assertFalse(admin.debeCompletarIdentidad());
+        assertFalse(admin.isDebeCambiarPassword());
+        assertEquals("Ana Diaz Vega", admin.nombreCompleto());
+    }
+
+    @Test
+    @DisplayName("RF-06b: un Administrador dado de alta por otro solo cambia su contrasena")
+    void administradorRegistradoNoCompletaIdentidad() {
+        Usuario admin = personaRegistrada();
+        admin.asignarComoAdministrador();
+        admin.asignarPasswordTemporal("$2a$10$temporal");
+
+        assertTrue(admin.isDebeCambiarPassword());
+        assertFalse(admin.debeCompletarIdentidad());
+        assertThrows(ReglaNegocioException.class, () -> admin.completarPrimerIngreso(
+                new NombrePersona("Otro", "Nombre", "Cualquiera"), new Dni("87654321"), "$2a$10$otrohash"));
+        assertEquals("Juan Perez Lopez", admin.nombreCompleto());
+    }
+
+    @Test
+    @DisplayName("RF-06b: restablecer la contrasena de la cuenta inicial ya completada no pide datos")
+    void restablecerCuentaInicialCompletadaNoPideDatos() {
+        Usuario admin = administradorInicial();
+        admin.completarPrimerIngreso(new NombrePersona("Ana", "Diaz", "Vega"), new Dni("45871236"),
+                "$2a$10$otrohash");
+
+        admin.asignarPasswordTemporal("$2a$10$temporal");
+
+        assertTrue(admin.isDebeCambiarPassword());
+        assertFalse(admin.debeCompletarIdentidad());
+    }
+
     @Test
     @DisplayName("RF-24: el DNI debe tener exactamente 8 digitos")
     void dniInvalidoEsRechazado() {

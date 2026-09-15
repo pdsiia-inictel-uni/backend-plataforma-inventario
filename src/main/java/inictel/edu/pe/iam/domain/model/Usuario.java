@@ -40,6 +40,12 @@ public class Usuario {
     /** RF-06b: cargo con el que queda la primera persona de la plataforma. */
     public static final String CARGO_ADMINISTRADOR_SISTEMA = "Administrador del sistema";
 
+    /**
+     * RF-06b: nombre de relleno con el que nace la cuenta administradora
+     * inicial. Mientras la cuenta lo conserve, su identidad esta por declarar.
+     */
+    public static final NombrePersona NOMBRE_DE_RELLENO = new NombrePersona("Administrador", "del", "Sistema");
+
     private Long id;
     private NombreUsuario username;
     private NombrePersona nombre;
@@ -103,13 +109,14 @@ public class Usuario {
      * nadie que pueda asignarselo: es el primero.</p>
      */
     public static Usuario registrarAdministradorInicial(NombreUsuario username,
-                                                        NombrePersona nombre,
                                                         Dni dni,
                                                         CorreoInstitucional correo,
                                                         String passwordHash) {
         Usuario usuario = new Usuario();
         usuario.username = exigirUsername(username);
-        usuario.nombre = exigirNombre(nombre);
+        // RF-06b: nace con el nombre de relleno, que es lo que marca que su
+        // identidad real queda por declarar en el primer ingreso.
+        usuario.nombre = NOMBRE_DE_RELLENO;
         usuario.dni = exigirDni(dni);
         usuario.cargo = CARGO_ADMINISTRADOR_SISTEMA;
         usuario.correo = exigirCorreo(correo);
@@ -198,17 +205,14 @@ public class Usuario {
      * inicial es el Administrador del sistema.</p>
      */
     public void completarPrimerIngreso(NombrePersona nombre, Dni dni, String nuevoHash) {
+        if (!debeCompletarIdentidad()) {
+            throw new ReglaNegocioException(
+                    "Sus datos personales ya están registrados. Solo tiene que cambiar su contraseña.");
+        }
         this.nombre = exigirNombre(nombre);
         this.dni = exigirDni(dni);
         this.cargo = CARGO_ADMINISTRADOR_SISTEMA;
         cambiarPassword(nuevoHash);
-    }
-
-    /** Cambio de las credenciales propias: nombre de usuario y correo. */
-    public void actualizarCredencialesPropias(NombreUsuario username, CorreoInstitucional correo) {
-        this.username = exigirUsername(username);
-        this.correo = exigirCorreo(correo);
-        this.fechaActualizacion = LocalDateTime.now();
     }
 
     // ------------------------------------------------------------------
@@ -228,11 +232,11 @@ public class Usuario {
         exigirCuentaUtilizable();
         exigirPuestoLibre();
         if (coordinacion == null) {
-            throw new DatosInvalidosException("coordinacionId", "Seleccione la coordinacion.");
+            throw new DatosInvalidosException("coordinacionId", "Seleccione la coordinación.");
         }
         if (rolAsignado != Rol.RESPONSABLE && rolAsignado != Rol.OPERADOR) {
             throw new DatosInvalidosException("rol",
-                    "En una coordinacion solo se asigna el rol de Responsable o el de Operador.");
+                    "En una coordinación solo se asigna el rol de Responsable o el de Operador.");
         }
         this.rol = rolAsignado;
         this.coordinaciones.add(coordinacion);
@@ -267,7 +271,7 @@ public class Usuario {
     public void retirarDe(Long coordinacion) {
         if (!coordinaciones.remove(coordinacion)) {
             throw new ReglaNegocioException(
-                    "'" + nombreCompleto() + "' no tiene ninguna asignacion en esa coordinacion.");
+                    "'" + nombreCompleto() + "' no tiene ninguna asignación en esa coordinación.");
         }
         if (coordinaciones.isEmpty()) {
             this.rol = null;
@@ -293,10 +297,10 @@ public class Usuario {
         if (rol == null && coordinaciones.isEmpty()) {
             return;
         }
-        String puesto = rol == null ? "una coordinacion asignada" : "el puesto de " + etiqueta(rol);
+        String puesto = rol == null ? "una coordinación asignada" : "el puesto de " + etiqueta(rol);
         throw new ReglaNegocioException(
                 "'" + nombreCompleto() + "' ya tiene " + puesto + ". Solo se asigna un puesto a quien "
-                        + "esta registrado sin ninguno: dele de baja el que tiene y despues asignele "
+                        + "esta registrado sin ninguno: dele de baja el que tiene y después asignele "
                         + "el nuevo.");
     }
 
@@ -311,7 +315,7 @@ public class Usuario {
             return;
         }
         throw new ReglaNegocioException("'" + nombreCompleto() + "' esta dado de baja de la "
-                + "institucion. Reincorporelo antes de asignarle un puesto.");
+                + "institución. Reincorporelo antes de asignarle un puesto.");
     }
 
     /**
@@ -359,7 +363,7 @@ public class Usuario {
     public void darDeBaja() {
         if (estado == EstadoCuenta.BAJA) {
             throw new ReglaNegocioException(
-                    "'" + nombreCompleto() + "' ya esta dado de baja de la institucion.");
+                    "'" + nombreCompleto() + "' ya esta dado de baja de la institución.");
         }
         this.estado = EstadoCuenta.BAJA;
         liberarPuesto();
@@ -411,11 +415,11 @@ public class Usuario {
     public void asumirResponsabilidadDe(Long coordinacion) {
         exigirCuentaUtilizable();
         if (coordinacion == null) {
-            throw new DatosInvalidosException("coordinacionId", "Seleccione la coordinacion.");
+            throw new DatosInvalidosException("coordinacionId", "Seleccione la coordinación.");
         }
         if (esResponsable()) {
             throw new ReglaNegocioException(
-                    "'" + nombreCompleto() + "' ya es responsable de una coordinacion. Nadie responde "
+                    "'" + nombreCompleto() + "' ya es responsable de una coordinación. Nadie responde "
                             + "por dos inventarios a la vez.");
         }
         this.coordinaciones.clear();
@@ -469,6 +473,20 @@ public class Usuario {
         return rol == Rol.ADMIN;
     }
 
+    /**
+     * RF-06b: la cuenta todavia debe declarar su identidad real.
+     *
+     * <p>Solo le ocurre a la cuenta administradora inicial, que nace con datos
+     * de relleno porque no hay nadie que la registre. Cualquier otro
+     * Administrador lo dio de alta una persona con su nombre y su DNI reales,
+     * igual que a los demas roles, y en su primer ingreso solo cambia la
+     * contrasena. Un restablecimiento posterior de la contrasena de la cuenta
+     * inicial tampoco vuelve a pedir los datos: ya no son de relleno.</p>
+     */
+    public boolean debeCompletarIdentidad() {
+        return esAdmin() && debeCambiarPassword && NOMBRE_DE_RELLENO.equals(nombre);
+    }
+
     public boolean esResponsable() {
         return rol == Rol.RESPONSABLE;
     }
@@ -520,7 +538,7 @@ public class Usuario {
 
     private static String exigirHash(String valor) {
         if (valor == null || valor.isBlank()) {
-            throw new IllegalArgumentException("El hash de la contrasena no puede estar vacio.");
+            throw new IllegalArgumentException("El hash de la contraseña no puede estar vacio.");
         }
         return valor;
     }

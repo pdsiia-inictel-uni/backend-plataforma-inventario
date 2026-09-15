@@ -76,7 +76,7 @@ public class GestionPrestamosServicio {
 
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.puedeLeerCoordinacion(bien.coordinacionId())) {
-            throw new AccesoDenegadoException("No tiene acceso a los prestamos de otra coordinacion.");
+            throw new AccesoDenegadoException("No tiene acceso a los préstamos de otra coordinación.");
         }
         return prestamos.historialPorBien(equipoId).stream().map(PrestamoDto::de).toList();
     }
@@ -149,12 +149,12 @@ public class GestionPrestamosServicio {
         // RN-19: el dano marca el bien para revision, no lo retira del servicio.
         String detalle = guardado.isReportaDano()
                 ? "Devuelto por " + guardado.getPersona().nombre()
-                        + " con observaciones. Queda pendiente de revision del responsable."
+                        + " con observaciones. Queda pendiente de revisión del responsable."
                 : "Devuelto conforme por " + guardado.getPersona().nombre() + ".";
         catalogo.registrarRetorno(guardado.getBien().id(), guardado.isReportaDano(), detalle);
 
         String resultado = guardado.isReportaDano()
-                ? "Operativo, pendiente de revision del responsable"
+                ? "Operativo, pendiente de revisión del responsable"
                 : "Operativo";
         return PrestamoDto.de(guardado);
     }
@@ -175,7 +175,7 @@ public class GestionPrestamosServicio {
     private void exigirResponsableVigente(Long coordinacionId) {
         if (!directorio.tieneResponsableVigente(coordinacionId)) {
             throw new ReglaNegocioException(
-                    "Su coordinacion no tiene responsable en este momento, asi que no puede "
+                    "Su coordinación no tiene responsable en este momento, asi que no puede "
                             + "registrar movimientos de equipos. Pida al Administrador que nombre uno.");
         }
     }
@@ -197,7 +197,7 @@ public class GestionPrestamosServicio {
     private void exigirLectura(Prestamo prestamo) {
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.puedeLeerCoordinacion(prestamo.coordinacionId())) {
-            throw new AccesoDenegadoException("No tiene acceso a los prestamos de otra coordinacion.");
+            throw new AccesoDenegadoException("No tiene acceso a los préstamos de otra coordinación.");
         }
     }
 
@@ -206,8 +206,8 @@ public class GestionPrestamosServicio {
         UsuarioAutenticado actual = contexto.requerido();
         if (actual.esAdmin()) {
             throw new AccesoDenegadoException(
-                    "El Administrador no registra prestamos ni devoluciones. Esa gestion corresponde al "
-                            + "responsable y a los operadores de cada coordinacion.");
+                    "El Administrador no registra préstamos ni devoluciones. Esa gestión corresponde al "
+                            + "responsable y a los operadores de cada coordinación.");
         }
         return actual;
     }
@@ -218,7 +218,7 @@ public class GestionPrestamosServicio {
 
     private Prestamo exigirPrestamo(Long id) {
         return prestamos.buscarPorId(id)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("el prestamo", id));
+                .orElseThrow(() -> RecursoNoEncontradoException.de("el préstamo", id));
     }
 
     /** RN-15, RN-16: solo sale un bien operativo, activo y sin prestamo vigente. */
@@ -228,11 +228,11 @@ public class GestionPrestamosServicio {
         }
         if (prestamos.tienePrestamoActivo(equipoId)) {
             throw new ReglaNegocioException(
-                    "El bien ya se encuentra prestado. Registre su devolucion antes de volver a prestarlo.");
+                    "El bien ya se encuentra prestado. Registre su devolución antes de volver a prestarlo.");
         }
         if (!catalogo.estaDisponible(equipoId)) {
             throw new ReglaNegocioException(
-                    "Solo pueden prestarse bienes disponibles. Condicion actual: "
+                    "Solo pueden prestarse bienes disponibles. Condición actual: "
                             + catalogo.condicionActual(equipoId) + ".");
         }
     }

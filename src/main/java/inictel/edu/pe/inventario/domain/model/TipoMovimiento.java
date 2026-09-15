@@ -13,7 +13,7 @@ public enum TipoMovimiento {
     PRESTAMO("Prestado"),
     DEVOLUCION("Devuelto"),
     MANTENIMIENTO("Enviado a mantenimiento"),
-    OPERATIVO("Devuelto a condicion operativa"),
+    OPERATIVO("Devuelto a condición operativa"),
     BAJA("Dado de baja"),
     REINCORPORACION("Reincorporado al inventario"),
     EDICION("Datos modificados"),

@@ -19,7 +19,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface PasswordSeguro {
 
-    String message() default "La contrasena debe tener al menos 8 caracteres e incluir letras, numeros y al menos un caracter especial.";
+    String message() default "La contraseña debe tener al menos 8 caracteres e incluir letras, números y al menos un carácter especial.";
 
     Class<?>[] groups() default {};
 

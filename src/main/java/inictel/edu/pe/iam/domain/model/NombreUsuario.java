@@ -22,7 +22,7 @@ public record NombreUsuario(String valor) {
         }
         if (!FORMATO.matcher(valor).matches()) {
             throw new DatosInvalidosException("username",
-                    "El nombre de usuario solo admite letras, numeros, punto, guion y guion bajo.");
+                    "El nombre de usuario solo admite letras, números, punto, guion y guion bajo.");
         }
     }
 

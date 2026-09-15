@@ -34,7 +34,7 @@ public class ManejadorNoAutenticado implements AuthenticationEntryPoint {
         RespuestaError error = RespuestaError.de(
                 HttpStatus.UNAUTHORIZED.value(),
                 "NO_AUTENTICADO",
-                "Su sesion no es valida o ha expirado. Vuelva a iniciar sesion.",
+                "Su sesión no es valida o ha expirado. Vuelva a iniciar sesión.",
                 request.getRequestURI());
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());

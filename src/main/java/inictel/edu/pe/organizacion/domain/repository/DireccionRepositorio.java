@@ -13,7 +13,7 @@ public interface DireccionRepositorio {
     Optional<Direccion> buscarPorId(Long id);
 
     /** Todas las direcciones, ordenadas por nombre. */
-    List<Direccion> listar(boolean soloActivas);
+    List<Direccion> listar();
 
     boolean existeNombre(String nombre, Long idActual);
 }

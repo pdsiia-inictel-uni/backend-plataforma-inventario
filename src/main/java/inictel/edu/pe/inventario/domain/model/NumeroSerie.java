@@ -16,12 +16,12 @@ public record NumeroSerie(String valor) {
     public NumeroSerie {
         if (valor == null || valor.isBlank()) {
             throw new DatosInvalidosException("numeroSerie",
-                    "Ingrese el numero de serie (use S/N si el bien no tiene).");
+                    "Ingrese el número de serie (use S/N si el bien no tiene).");
         }
         String limpio = valor.trim();
         if (limpio.length() > LONGITUD_MAXIMA) {
             throw new DatosInvalidosException("numeroSerie",
-                    "El numero de serie no puede superar los 100 caracteres.");
+                    "El número de serie no puede superar los 100 caracteres.");
         }
         valor = SIN_SERIE.equalsIgnoreCase(limpio) ? SIN_SERIE : limpio;
     }

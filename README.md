@@ -9,5 +9,7 @@
 
 ## Licencia
 
+.\backend\mvnw.cmd -f .\backend\pom.xml spring-boot:run
+
 Distribuido bajo la **Licencia MIT**. El texto completo esta en el archivo
 [LICENSE](LICENSE) de este directorio.

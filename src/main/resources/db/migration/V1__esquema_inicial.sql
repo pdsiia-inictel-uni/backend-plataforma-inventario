@@ -31,17 +31,13 @@
 --
 -- Son las dos del reglamento de organizacion y funciones de INICTEL-UNI. Se
 -- precargan en V2 y la aplicacion no ofrece alta ni desactivacion (RN-30):
--- solo la correccion de sus datos. La columna "activa" se conserva por
--- simetria con el resto de la jerarquia y vale siempre TRUE.
+-- solo la correccion de su nombre y su sigla. Sin estado ni fechas: una
+-- direccion existe siempre y nadie la apaga.
 -- ---------------------------------------------------------------------------
 CREATE TABLE direccion (
     id                   BIGSERIAL     PRIMARY KEY,
     nombre               VARCHAR(150)  NOT NULL,
     sigla                VARCHAR(20),
-    descripcion          VARCHAR(500),
-    activa               BOOLEAN       NOT NULL DEFAULT TRUE,
-    fecha_creacion       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion  TIMESTAMP,
     CONSTRAINT ck_direccion_nombre CHECK (LENGTH(TRIM(nombre)) > 0)
 );
 
@@ -58,22 +54,21 @@ COMMENT ON COLUMN direccion.sigla IS
 -- No tiene sigla: en la institucion las coordinaciones se nombran por su
 -- nombre, y el campo se quedaba vacio o se rellenaba con una abreviatura
 -- inventada en el momento, distinta en cada tarjeta.
+--
+-- Tampoco tiene estado: una coordinacion es una unidad estable de la
+-- institucion y no se desactiva (RF-13).
 -- ---------------------------------------------------------------------------
 CREATE TABLE coordinacion (
     id                   BIGSERIAL     PRIMARY KEY,
     direccion_id         BIGINT        NOT NULL REFERENCES direccion (id),
     nombre               VARCHAR(150)  NOT NULL,
     descripcion          VARCHAR(500),
-    activa               BOOLEAN       NOT NULL DEFAULT TRUE,
-    fecha_creacion       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion  TIMESTAMP,
     CONSTRAINT ck_coordinacion_nombre CHECK (LENGTH(TRIM(nombre)) > 0)
 );
 
 -- RN-02: el nombre es unico dentro de su Direccion
 CREATE UNIQUE INDEX uk_coordinacion_nombre ON coordinacion (direccion_id, LOWER(nombre));
 CREATE INDEX ix_coordinacion_direccion ON coordinacion (direccion_id);
-CREATE INDEX ix_coordinacion_activa    ON coordinacion (activa);
 
 -- Necesario para la llave foranea compuesta de LABORATORIO (RN-03)
 CREATE UNIQUE INDEX uk_coordinacion_id_direccion ON coordinacion (id, direccion_id);
@@ -83,15 +78,15 @@ COMMENT ON TABLE coordinacion IS
 
 -- ---------------------------------------------------------------------------
 -- LABORATORIO (RF-12)
+--
+-- Sin estado: un laboratorio no se desactiva. Existe mientras la coordinacion
+-- lo tenga registrado.
 -- ---------------------------------------------------------------------------
 CREATE TABLE laboratorio (
     id                   BIGSERIAL     PRIMARY KEY,
     coordinacion_id      BIGINT        NOT NULL REFERENCES coordinacion (id),
     nombre               VARCHAR(150)  NOT NULL,
     ubicacion            VARCHAR(200),
-    activo               BOOLEAN       NOT NULL DEFAULT TRUE,
-    fecha_creacion       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion  TIMESTAMP,
     CONSTRAINT ck_laboratorio_nombre CHECK (LENGTH(TRIM(nombre)) > 0)
 );
 
@@ -103,7 +98,7 @@ CREATE INDEX ix_laboratorio_coordinacion  ON laboratorio (coordinacion_id);
 CREATE UNIQUE INDEX uk_laboratorio_id_coordinacion ON laboratorio (id, coordinacion_id);
 
 COMMENT ON TABLE laboratorio IS
-    'Ubicacion fisica dentro de una Coordinacion (RF-12). Toda Coordinacion nace con uno y conserva al menos uno activo (RN-26).';
+    'Ubicacion fisica dentro de una Coordinacion (RF-12). Toda Coordinacion nace con uno (RN-26).';
 
 -- ---------------------------------------------------------------------------
 -- USUARIO (RF-16 .. RF-30)

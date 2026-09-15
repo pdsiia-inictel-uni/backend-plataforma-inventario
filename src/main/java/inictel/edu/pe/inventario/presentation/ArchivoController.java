@@ -48,7 +48,7 @@ public class ArchivoController {
                     .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
                     .body(new FileSystemResource(ruta));
         } catch (IOException ex) {
-            throw new UncheckedIOException("No se pudo leer la fotografia solicitada.", ex);
+            throw new UncheckedIOException("No se pudo leer la fotografía solicitada.", ex);
         }
     }
 }

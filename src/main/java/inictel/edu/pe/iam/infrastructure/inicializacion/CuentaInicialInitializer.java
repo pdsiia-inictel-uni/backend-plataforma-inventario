@@ -3,7 +3,6 @@ package inictel.edu.pe.iam.infrastructure.inicializacion;
 import inictel.edu.pe.compartido.infrastructure.config.AppProperties;
 import inictel.edu.pe.iam.domain.model.CorreoInstitucional;
 import inictel.edu.pe.iam.domain.model.Dni;
-import inictel.edu.pe.iam.domain.model.NombrePersona;
 import inictel.edu.pe.iam.domain.model.NombreUsuario;
 import inictel.edu.pe.iam.domain.model.Usuario;
 import inictel.edu.pe.iam.domain.repository.UsuarioRepositorio;
@@ -48,18 +47,20 @@ public class CuentaInicialInitializer implements ApplicationRunner {
         // todavia nadie que pueda asignarselos (RF-16b, RN-05).
         Usuario admin = Usuario.registrarAdministradorInicial(
                 new NombreUsuario(cfg.username()),
-                new NombrePersona("Administrador", "del", "Sistema"),
                 new Dni(cfg.dni()),
                 new CorreoInstitucional(cfg.correo()),
                 cifrador.cifrar(cfg.password()));
 
         usuarios.guardar(admin);
 
+        // La contrasena no se escribe en el registro: los logs se copian,
+        // se rotan y los leen personas que no deben conocerla (RF-05, RNF-45).
+        // Quien despliega ya la tiene en APP_CUENTA_INICIAL_PASSWORD.
         log.warn("""
                 ================================================================
                  CUENTA ADMINISTRADORA INICIAL CREADA
                  Usuario    : {}
-                 Contrasena : {}
+                 Contrasena : la definida en APP_CUENTA_INICIAL_PASSWORD
 
                  Los datos personales de esta cuenta son de relleno. En el primer
                  ingreso el sistema pedira los reales (nombres, apellidos y DNI)
@@ -75,6 +76,6 @@ public class CuentaInicialInitializer implements ApplicationRunner {
                  contrasena. Una coordinacion no puede operar hasta tener su
                  responsable.
                 ================================================================
-                """, cfg.username(), cfg.password());
+                """, cfg.username());
     }
 }

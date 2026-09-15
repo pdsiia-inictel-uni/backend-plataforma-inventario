@@ -34,7 +34,7 @@ public class ManejadorAccesoDenegado implements AccessDeniedHandler {
         RespuestaError error = RespuestaError.de(
                 HttpStatus.FORBIDDEN.value(),
                 "ACCESO_DENEGADO",
-                "No cuenta con permisos para realizar esta operacion.",
+                "No cuenta con permisos para realizar esta operación.",
                 request.getRequestURI());
 
         response.setStatus(HttpStatus.FORBIDDEN.value());

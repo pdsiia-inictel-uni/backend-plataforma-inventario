@@ -9,11 +9,7 @@ public interface CoordinacionJpaRepository extends JpaRepository<CoordinacionJpa
 
     List<CoordinacionJpaEntity> findAllByOrderByNombreAsc();
 
-    List<CoordinacionJpaEntity> findByActivaTrueOrderByNombreAsc();
-
     List<CoordinacionJpaEntity> findByDireccionIdOrderByNombreAsc(Long direccionId);
-
-    List<CoordinacionJpaEntity> findByDireccionIdAndActivaTrueOrderByNombreAsc(Long direccionId);
 
     boolean existsByDireccionIdAndNombreIgnoreCase(Long direccionId, String nombre);
 

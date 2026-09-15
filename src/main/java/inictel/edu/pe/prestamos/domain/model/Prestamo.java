@@ -49,7 +49,7 @@ public class Prestamo {
 
         if (fechaEstimadaDevolucion != null && fechaEstimadaDevolucion.isBefore(LocalDate.now())) {
             throw new DatosInvalidosException("fechaEstimadaDevolucion",
-                    "La fecha estimada de devolucion no puede ser anterior a hoy.");
+                    "La fecha estimada de devolución no puede ser anterior a hoy.");
         }
 
         Prestamo prestamo = new Prestamo();
@@ -111,11 +111,11 @@ public class Prestamo {
                                     OperadorPrestamo usuarioRecibe) {
 
         if (estado == EstadoPrestamo.DEVUELTO) {
-            throw new ReglaNegocioException("Este prestamo ya fue devuelto el " + fechaDevolucion + ".");
+            throw new ReglaNegocioException("Este préstamo ya fue devuelto el " + fechaDevolucion + ".");
         }
         if (!conforme && (observacionesRetorno == null || observacionesRetorno.isBlank())) {
             throw new DatosInvalidosException("observacionesRetorno",
-                    "Si la devolucion no es conforme debe detallar el estado en que se recibe el bien.");
+                    "Si la devolución no es conforme debe detallar el estado en que se recibe el bien.");
         }
 
         this.conforme = conforme;

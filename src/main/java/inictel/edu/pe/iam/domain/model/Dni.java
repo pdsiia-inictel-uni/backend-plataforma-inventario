@@ -16,7 +16,7 @@ public record Dni(String valor) {
 
     public Dni {
         if (valor == null || !FORMATO.matcher(valor.trim()).matches()) {
-            throw new DatosInvalidosException("dni", "El DNI debe tener exactamente 8 digitos numericos.");
+            throw new DatosInvalidosException("dni", "El DNI debe tener exactamente 8 dígitos numericos.");
         }
         valor = valor.trim();
     }

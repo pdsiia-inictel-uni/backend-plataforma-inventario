@@ -28,8 +28,8 @@ public class EstructuraOrganizacionalAcl implements EstructuraOrganizacional {
     }
 
     @Override
-    public boolean existeCoordinacionActiva(Long coordinacionId) {
-        return coordinacionId != null && organizacion.existeCoordinacionActiva(coordinacionId);
+    public boolean existeCoordinacion(Long coordinacionId) {
+        return coordinacionId != null && organizacion.existeCoordinacion(coordinacionId);
     }
 
     @Override

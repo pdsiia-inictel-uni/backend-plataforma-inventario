@@ -31,10 +31,6 @@ public interface EquipoJpaRepository
 
     List<EquipoJpaEntity> findByResponsableEquipoIdAndActivoTrue(Long responsableEquipoId);
 
-    long countByCoordinacionIdAndActivoTrue(Long coordinacionId);
-
-    long countByLaboratorioId(Long laboratorioId);
-
     long countByCoordinacionIdAndRevisionPendienteTrue(Long coordinacionId);
 
     long countByRevisionPendienteTrue();
@@ -52,6 +48,18 @@ public interface EquipoJpaRepository
             GROUP BY e.condicion
             """)
     List<Object[]> contarPorCondicion(@Param("coordinacionId") Long coordinacionId);
+
+    /**
+     * RF-14: bienes de un laboratorio por condicion. Los dados de baja se
+     * cuentan tambien, porque son los unicos que no impiden desactivarlo.
+     */
+    @Query("""
+            SELECT e.condicion, COUNT(e)
+            FROM EquipoJpaEntity e
+            WHERE e.laboratorioId = :laboratorioId
+            GROUP BY e.condicion
+            """)
+    List<Object[]> contarPorCondicionEnLaboratorio(@Param("laboratorioId") Long laboratorioId);
 
     /**
      * RF-84: cuantos bienes en servicio lleva cada persona de la Coordinacion.

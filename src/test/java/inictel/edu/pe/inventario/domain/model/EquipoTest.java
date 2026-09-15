@@ -240,7 +240,7 @@ class EquipoTest {
             equipo.marcarComoPrestado();
             assertThatThrownBy(() -> equipo.darDeBaja("Obsoleto"))
                     .isInstanceOf(ReglaNegocioException.class)
-                    .hasMessageContaining("devolucion");
+                    .hasMessageContaining("devolución");
         }
 
         @Test

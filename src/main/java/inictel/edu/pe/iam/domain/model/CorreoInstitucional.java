@@ -19,7 +19,7 @@ public record CorreoInstitucional(String valor) {
             throw new DatosInvalidosException("correo", "El correo no puede superar los 150 caracteres.");
         }
         if (!FORMATO.matcher(valor).matches()) {
-            throw new DatosInvalidosException("correo", "El correo institucional no tiene un formato valido.");
+            throw new DatosInvalidosException("correo", "El correo institucional no tiene un formato válido.");
         }
     }
 

@@ -67,7 +67,7 @@ public class FormatoUsoServicio {
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.esResponsable()) {
             throw new AccesoDenegadoException(
-                    "El formato de registro de uso lo emite el responsable de la coordinacion.");
+                    "El formato de registro de uso lo emite el responsable de la coordinación.");
         }
 
         EquipoDto equipo = inventario.fichaDe(equipoId)

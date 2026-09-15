@@ -60,7 +60,7 @@ public class PanelControlServicio {
     /** RF-75: vision de toda la institucion, con la alerta de coordinaciones huerfanas. */
     private PanelControlDto panelInstitucional(UsuarioAutenticado actual) {
         ResumenBienesDto bienes = inventario.resumen(null);
-        EstructuraDto arbol = estructura.estructura(false);
+        EstructuraDto arbol = estructura.estructura();
 
         long coordinaciones = arbol.direcciones().stream()
                 .mapToLong(rama -> rama.coordinaciones().size())
@@ -96,7 +96,7 @@ public class PanelControlServicio {
         Long coordinacionId = actual.coordinacionRequerida();
         ResumenBienesDto bienes = inventario.resumen(coordinacionId);
         String ambito = organizacion.nombreCompletoDeCoordinacion(coordinacionId)
-                .orElse("Su coordinacion");
+                .orElse("Su coordinación");
 
         return new PanelControlDto(
                 actual.rol(),
@@ -110,7 +110,10 @@ public class PanelControlServicio {
                 bienes.revisionPendiente(),
                 prestamos.contarActivos(coordinacionId),
                 prestamos.contarVencidos(coordinacionId),
-                iam.contarUsuariosActivosEn(coordinacionId),
+                // RF-76: el panel lo rotula "Operadores en la coordinacion". Contar
+                // a todos los usuarios activos sumaba tambien al Responsable, y la
+                // cifra no coincidia con la tarjeta de Direcciones.
+                iam.contarOperadoresActivosEn(coordinacionId),
                 0, 0, 0,
                 // RN-07: 1 si la propia coordinacion esta sin responsable, y
                 // por tanto parada. Es la unica alerta que le impide trabajar a

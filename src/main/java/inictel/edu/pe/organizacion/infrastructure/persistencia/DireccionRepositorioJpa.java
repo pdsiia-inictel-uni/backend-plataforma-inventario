@@ -33,11 +33,8 @@ public class DireccionRepositorioJpa implements DireccionRepositorio {
     }
 
     @Override
-    public List<Direccion> listar(boolean soloActivas) {
-        List<DireccionJpaEntity> entidades = soloActivas
-                ? jpa.findByActivaTrueOrderByNombreAsc()
-                : jpa.findAllByOrderByNombreAsc();
-        return entidades.stream().map(OrganizacionMapper::aDominio).toList();
+    public List<Direccion> listar() {
+        return jpa.findAllByOrderByNombreAsc().stream().map(OrganizacionMapper::aDominio).toList();
     }
 
     @Override

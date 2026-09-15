@@ -119,19 +119,20 @@ public class EquipoRepositorioJpa implements EquipoRepositorio {
     }
 
     @Override
-    public long contarActivosEnCoordinacion(Long coordinacionId) {
-        return coordinacionId == null ? 0 : jpa.countByCoordinacionIdAndActivoTrue(coordinacionId);
-    }
-
-    @Override
-    public long contarEnLaboratorio(Long laboratorioId) {
-        return laboratorioId == null ? 0 : jpa.countByLaboratorioId(laboratorioId);
+    public Map<CondicionEquipo, Long> contarPorCondicionEnLaboratorio(Long laboratorioId) {
+        return laboratorioId == null
+                ? Map.of()
+                : aConteoPorCondicion(jpa.contarPorCondicionEnLaboratorio(laboratorioId));
     }
 
     @Override
     public Map<CondicionEquipo, Long> contarPorCondicion(Long coordinacionId) {
+        return aConteoPorCondicion(jpa.contarPorCondicion(coordinacionId));
+    }
+
+    private static Map<CondicionEquipo, Long> aConteoPorCondicion(List<Object[]> filas) {
         Map<CondicionEquipo, Long> resultado = new LinkedHashMap<>();
-        for (Object[] fila : jpa.contarPorCondicion(coordinacionId)) {
+        for (Object[] fila : filas) {
             resultado.put((CondicionEquipo) fila[0], ((Number) fila[1]).longValue());
         }
         return resultado;

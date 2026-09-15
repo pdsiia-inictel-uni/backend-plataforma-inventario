@@ -74,7 +74,7 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<RespuestaError> accesoDenegado(AccessDeniedException ex, HttpServletRequest req) {
         return construir(HttpStatus.FORBIDDEN, "ACCESO_DENEGADO",
-                "No cuenta con permisos para realizar esta operacion.", req, null);
+                "No cuenta con permisos para realizar esta operación.", req, null);
     }
 
     /**
@@ -96,7 +96,7 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<RespuestaError> rutaInexistente(Exception ex, HttpServletRequest req) {
         return construir(HttpStatus.NOT_FOUND, "RUTA_NO_ENCONTRADA",
-                "La direccion solicitada no existe.", req, null);
+                "La dirección solicitada no existe.", req, null);
     }
 
     /**
@@ -111,20 +111,20 @@ public class ManejadorGlobalErrores {
     public ResponseEntity<RespuestaError> metodoNoAdmitido(HttpRequestMethodNotSupportedException ex,
                                                            HttpServletRequest req) {
         return construir(HttpStatus.METHOD_NOT_ALLOWED, "METODO_NO_ADMITIDO",
-                "Esa operacion no existe en esta direccion.", req, null);
+                "Esa operación no existe en esta dirección.", req, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<RespuestaError> integridad(DataIntegrityViolationException ex, HttpServletRequest req) {
         log.warn("Violacion de integridad en {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
         return construir(HttpStatus.CONFLICT, "CONFLICTO_DATOS",
-                "La operacion no pudo completarse porque genera datos duplicados o inconsistentes.", req, null);
+                "La operación no pudo completarse porque genera datos duplicados o inconsistentes.", req, null);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<RespuestaError> tipoInvalido(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         return construir(HttpStatus.BAD_REQUEST, "PARAMETRO_INVALIDO",
-                "El valor del parametro '" + ex.getName() + "' no es valido.", req, null);
+                "El valor del parametro '" + ex.getName() + "' no es válido.", req, null);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -137,13 +137,13 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<RespuestaError> cuerpoIlegible(HttpMessageNotReadableException ex, HttpServletRequest req) {
         return construir(HttpStatus.BAD_REQUEST, "CUERPO_INVALIDO",
-                "El cuerpo de la peticion no tiene un formato valido.", req, null);
+                "El cuerpo de la peticion no tiene un formato válido.", req, null);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<RespuestaError> archivoGrande(MaxUploadSizeExceededException ex, HttpServletRequest req) {
         return construir(HttpStatus.PAYLOAD_TOO_LARGE, "ARCHIVO_MUY_GRANDE",
-                "El archivo supera el tamano maximo permitido (5 MB).", req, null);
+                "El archivo supera el tamaño máximo permitido (5 MB).", req, null);
     }
 
     @ExceptionHandler(Exception.class)

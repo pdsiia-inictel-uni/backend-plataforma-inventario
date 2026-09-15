@@ -33,19 +33,13 @@ public class CoordinacionRepositorioJpa implements CoordinacionRepositorio {
     }
 
     @Override
-    public List<Coordinacion> listar(boolean soloActivas) {
-        List<CoordinacionJpaEntity> entidades = soloActivas
-                ? jpa.findByActivaTrueOrderByNombreAsc()
-                : jpa.findAllByOrderByNombreAsc();
-        return entidades.stream().map(OrganizacionMapper::aDominio).toList();
+    public List<Coordinacion> listar() {
+        return jpa.findAllByOrderByNombreAsc().stream().map(OrganizacionMapper::aDominio).toList();
     }
 
     @Override
-    public List<Coordinacion> listarPorDireccion(Long direccionId, boolean soloActivas) {
-        List<CoordinacionJpaEntity> entidades = soloActivas
-                ? jpa.findByDireccionIdAndActivaTrueOrderByNombreAsc(direccionId)
-                : jpa.findByDireccionIdOrderByNombreAsc(direccionId);
-        return entidades.stream().map(OrganizacionMapper::aDominio).toList();
+    public List<Coordinacion> listarPorDireccion(Long direccionId) {
+        return jpa.findByDireccionIdOrderByNombreAsc(direccionId).stream().map(OrganizacionMapper::aDominio).toList();
     }
 
     @Override

@@ -207,7 +207,7 @@ public class Equipo {
         exigirActivo();
         if (condicion == CondicionEquipo.PRESTADO) {
             throw new ReglaNegocioException(
-                    "El bien esta prestado. Registre su devolucion antes de enviarlo a mantenimiento.");
+                    "El bien esta prestado. Registre su devolución antes de enviarlo a mantenimiento.");
         }
         if (condicion == CondicionEquipo.MANTENIMIENTO) {
             throw new ReglaNegocioException("El bien ya se encuentra en mantenimiento.");
@@ -223,7 +223,7 @@ public class Equipo {
         exigirActivo();
         if (condicion == CondicionEquipo.PRESTADO) {
             throw new ReglaNegocioException(
-                    "El bien esta prestado. Su condicion se actualizara al registrar la devolucion.");
+                    "El bien esta prestado. Su condición se actualizara al registrar la devolución.");
         }
         if (condicion == CondicionEquipo.OPERATIVO && !revisionPendiente) {
             throw new ReglaNegocioException("El bien ya se encuentra operativo.");
@@ -240,7 +240,7 @@ public class Equipo {
         }
         if (condicion == CondicionEquipo.PRESTADO) {
             throw new ReglaNegocioException(
-                    "No se puede dar de baja un bien prestado. Registre primero su devolucion.");
+                    "No se puede dar de baja un bien prestado. Registre primero su devolución.");
         }
         String limpio = motivo == null ? "" : motivo.trim();
         if (limpio.isEmpty()) {
@@ -281,7 +281,7 @@ public class Equipo {
         // RN-15: solo se presta lo que esta operativo.
         if (condicion != CondicionEquipo.OPERATIVO) {
             throw new ReglaNegocioException(
-                    "El bien no esta disponible (condicion actual: " + condicion.getEtiqueta() + ").");
+                    "El bien no esta disponible (condición actual: " + condicion.getEtiqueta() + ").");
         }
         this.condicion = CondicionEquipo.PRESTADO;
         this.fechaActualizacion = LocalDateTime.now();
@@ -375,14 +375,14 @@ public class Equipo {
     private static Long exigirCoordinacion(Long coordinacionId) {
         if (coordinacionId == null) {
             throw new DatosInvalidosException("coordinacionId",
-                    "El bien debe pertenecer a una coordinacion.");
+                    "El bien debe pertenecer a una coordinación.");
         }
         return coordinacionId;
     }
 
     private static ReferenciaCategoria exigirCategoria(ReferenciaCategoria categoria) {
         if (categoria == null) {
-            throw new DatosInvalidosException("categoriaId", "Seleccione la categoria del bien.");
+            throw new DatosInvalidosException("categoriaId", "Seleccione la categoría del bien.");
         }
         return categoria;
     }
@@ -397,15 +397,15 @@ public class Equipo {
      */
     private static LocalDate exigirFecha(LocalDate fecha) {
         if (fecha == null) {
-            throw new DatosInvalidosException("fechaAdquisicion", "Ingrese la fecha de adquisicion.");
+            throw new DatosInvalidosException("fechaAdquisicion", "Ingrese la fecha de adquisición.");
         }
         if (fecha.isBefore(FECHA_MINIMA)) {
             throw new DatosInvalidosException("fechaAdquisicion",
-                    "La fecha de adquisicion no puede ser anterior al " + FECHA_MINIMA + ".");
+                    "La fecha de adquisición no puede ser anterior al " + FECHA_MINIMA + ".");
         }
         if (fecha.isAfter(LocalDate.now())) {
             throw new DatosInvalidosException("fechaAdquisicion",
-                    "La fecha de adquisicion no puede ser futura.");
+                    "La fecha de adquisición no puede ser futura.");
         }
         return fecha;
     }

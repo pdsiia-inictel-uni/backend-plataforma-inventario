@@ -38,7 +38,7 @@ public class AlmacenFotosLocal implements AlmacenFotos {
         this.urlPublica = propiedades.archivos().urlPublica();
         try {
             Files.createDirectories(directorio);
-            log.info("Directorio de fotografias: {}", directorio);
+            log.info("Directorio de fotografías: {}", directorio);
         } catch (IOException ex) {
             throw new UncheckedIOException("No se pudo crear el directorio de archivos: " + directorio, ex);
         }
@@ -61,12 +61,12 @@ public class AlmacenFotosLocal implements AlmacenFotos {
         String nombre = UUID.randomUUID() + "." + extension;
         Path destino = directorio.resolve(nombre).normalize();
         if (!destino.startsWith(directorio)) {
-            throw new DatosInvalidosException("archivo", "El nombre del archivo no es valido.");
+            throw new DatosInvalidosException("archivo", "El nombre del archivo no es válido.");
         }
         try (contenido) {
             Files.copy(contenido, destino, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
-            throw new UncheckedIOException("No se pudo guardar la fotografia.", ex);
+            throw new UncheckedIOException("No se pudo guardar la fotografía.", ex);
         }
         return urlPublica + "/" + nombre;
     }
@@ -92,10 +92,10 @@ public class AlmacenFotosLocal implements AlmacenFotos {
         }
         try {
             if (Files.deleteIfExists(ruta)) {
-                log.info("Fotografia sustituida eliminada: {}", nombre);
+                log.info("Fotografía sustituida eliminada: {}", nombre);
             }
         } catch (IOException ex) {
-            log.warn("No se pudo eliminar la fotografia sustituida {}: {}", nombre, ex.getMessage());
+            log.warn("No se pudo eliminar la fotografía sustituida {}: {}", nombre, ex.getMessage());
         }
     }
 

@@ -124,7 +124,7 @@ public class GestionInventarioServicio {
         Long ambito = actual.ambitoDeConsulta(coordinacionId);
         if (ambito == null) {
             throw new DatosInvalidosException("coordinacionId",
-                    "Elija la coordinacion cuyo reparto de equipos desea consultar.");
+                    "Elija la coordinación cuyo reparto de equipos desea consultar.");
         }
 
         Long responsableCoordinacion = directorio.responsableVigenteDe(ambito).orElse(null);
@@ -148,7 +148,7 @@ public class GestionInventarioServicio {
             String nombre = directorio.nombreDe(responsableCoordinacion)
                     // RN-07: una Coordinacion puede estar parada, sin responsable
                     // nombrado, y sus bienes siguen ahi esperando a quien llegue.
-                    .orElse("Responsable de la coordinacion");
+                    .orElse("Responsable de la coordinación");
             return new ResponsableEquipoDto(null, nombre, true, conteo.cantidad());
         }
         String nombre = directorio.nombreDe(conteo.responsableEquipoId())
@@ -208,9 +208,9 @@ public class GestionInventarioServicio {
 
         // RN-26: sin laboratorios no hay donde poner el bien, y un bien que no
         // se sabe donde esta no sirve de nada en un inventario.
-        if (!ubicaciones.tieneLaboratoriosActivos(coordinacionId)) {
+        if (!ubicaciones.tieneLaboratorios(coordinacionId)) {
             throw new ReglaNegocioException(
-                    "Su coordinacion aun no tiene laboratorios activos. "
+                    "Su coordinación aun no tiene laboratorios activos. "
                             + "Pida al Administrador que registre al menos uno antes de dar de alta equipos.");
         }
 
@@ -228,7 +228,7 @@ public class GestionInventarioServicio {
         // su tarjeta en rojo desde que se le da de baja al anterior (RF-26).
         Long responsableId = directorio.responsableVigenteDe(coordinacionId)
                 .orElseThrow(() -> new ReglaNegocioException(
-                        "Su coordinacion no tiene responsable en este momento, asi que no hay quien "
+                        "Su coordinación no tiene responsable en este momento, asi que no hay quien "
                                 + "responda por los equipos que se registren. Pida al Administrador "
                                 + "que nombre uno."));
 
@@ -251,7 +251,7 @@ public class GestionInventarioServicio {
         Equipo guardado = equipos.guardar(equipo);
 
         registrarMovimiento(guardado, TipoMovimiento.ALTA, null,
-                "Alta del bien en el inventario. Queda en condicion Operativo.");
+                "Alta del bien en el inventario. Queda en condición Operativo.");
 
         return componer(guardado);
     }
@@ -323,7 +323,7 @@ public class GestionInventarioServicio {
         if (operadorId == null) {
             if (!equipo.estaACargoDeUnOperador()) {
                 throw new ReglaNegocioException(
-                        "El equipo ya esta a su cargo como responsable de la coordinacion.");
+                        "El equipo ya esta a su cargo como responsable de la coordinación.");
             }
             equipo.devolverAlResponsableDeCoordinacion();
         } else {
@@ -332,7 +332,7 @@ public class GestionInventarioServicio {
             // personas, solo sus identificadores (RNF-39).
             if (!directorio.esOperadorActivoDe(operadorId, equipo.getCoordinacionId())) {
                 throw new DatosInvalidosException("responsableEquipoId",
-                        "Un equipo solo se entrega a un operador activo de su coordinacion.");
+                        "Un equipo solo se entrega a un operador activo de su coordinación.");
             }
             equipo.ponerACargoDe(operadorId);
         }
@@ -380,8 +380,8 @@ public class GestionInventarioServicio {
         Equipo guardado = equipos.guardar(equipo);
 
         String base = cerrabaRevision
-                ? "Revision conforme tras la devolucion con observaciones."
-                : "Devuelto a condicion operativa.";
+                ? "Revisión conforme tras la devolución con observaciones."
+                : "Devuelto a condición operativa.";
         String detalle = observacion == null || observacion.isBlank()
                 ? base
                 : base + " " + observacion.trim();
@@ -411,6 +411,7 @@ public class GestionInventarioServicio {
     public EquipoDto reincorporar(Long id, String motivo) {
         Equipo equipo = exigirEquipo(id);
         exigirResponsableDe(equipo);
+        exigirLaboratorioEnFuncionamiento(equipo);
 
         CondicionEquipo anterior = equipo.getCondicion();
         equipo.reincorporar();
@@ -488,7 +489,7 @@ public class GestionInventarioServicio {
     private void exigirLectura(Equipo equipo) {
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.puedeLeerCoordinacion(equipo.getCoordinacionId())) {
-            throw new AccesoDenegadoException("No tiene acceso a los bienes de otra coordinacion.");
+            throw new AccesoDenegadoException("No tiene acceso a los bienes de otra coordinación.");
         }
     }
 
@@ -500,8 +501,8 @@ public class GestionInventarioServicio {
         UsuarioAutenticado actual = contexto.requerido();
         if (actual.esAdmin()) {
             throw new AccesoDenegadoException(
-                    "El Administrador no registra ni modifica bienes. Esa gestion corresponde al "
-                            + "responsable y a los operadores de cada coordinacion.");
+                    "El Administrador no registra ni modifica bienes. Esa gestión corresponde al "
+                            + "responsable y a los operadores de cada coordinación.");
         }
         return actual;
     }
@@ -533,14 +534,14 @@ public class GestionInventarioServicio {
         }
         if (equipo.getFotoUrl() != null) {
             throw new AccesoDenegadoException(
-                    "Este equipo ya tiene fotografia. Sustituirla corresponde al responsable de la "
+                    "Este equipo ya tiene fotografía. Sustituirla corresponde al responsable de la "
                             + "coordinacion.");
         }
         if (equipo.getUsuarioRegistroId() == null
                 || !equipo.getUsuarioRegistroId().equals(actual.id())) {
             throw new AccesoDenegadoException(
-                    "Solo puede adjuntar la fotografia del equipo que usted mismo registro. En los "
-                            + "demas equipos la pone el responsable de la coordinacion.");
+                    "Solo puede adjuntar la fotografía del equipo que usted mismo registro. En los "
+                            + "demas equipos la pone el responsable de la coordinación.");
         }
     }
 
@@ -549,7 +550,7 @@ public class GestionInventarioServicio {
         UsuarioAutenticado actual = exigirOperativo();
         if (!actual.esResponsable()) {
             throw new AccesoDenegadoException(
-                    "Solo el responsable de la coordinacion puede modificar o dar de baja un bien.");
+                    "Solo el responsable de la coordinación puede modificar o dar de baja un bien.");
         }
         actual.exigirAccesoA(equipo.getCoordinacionId());
     }
@@ -594,7 +595,7 @@ public class GestionInventarioServicio {
 
     private String nombreLaboratorioODefecto(Long laboratorioId) {
         if (laboratorioId == null) {
-            return "ningun laboratorio";
+            return "ningún laboratorio";
         }
         return ubicaciones.nombreDeLaboratorio(laboratorioId).orElse("otro laboratorio");
     }
@@ -611,13 +612,13 @@ public class GestionInventarioServicio {
 
         // Los bienes sin serie comparten el valor convencional S/N.
         if (!numeroSerie.esSinSerie() && equipos.existeNumeroSerie(numeroSerie.valor(), idActual)) {
-            errores.agregar("numeroSerie", "Ya existe un bien registrado con ese numero de serie.");
+            errores.agregar("numeroSerie", "Ya existe un bien registrado con ese número de serie.");
         }
         if (equipos.existeCodigoInventario(inventario.valor(), idActual)) {
-            errores.agregar("codigoInventario", "Ya existe un bien con ese codigo de inventario.");
+            errores.agregar("codigoInventario", "Ya existe un bien con ese código de inventario.");
         }
         if (equipos.existeCodigoPatrimonial(patrimonial.valor(), idActual)) {
-            errores.agregar("codigoPatrimonial", "Ya existe un bien con ese codigo patrimonial.");
+            errores.agregar("codigoPatrimonial", "Ya existe un bien con ese código patrimonial.");
         }
         if (errores.tieneErrores()) {
             throw errores;
@@ -626,16 +627,36 @@ public class GestionInventarioServicio {
 
     private ReferenciaCategoria resolverCategoria(Long categoriaId, ReferenciaCategoria actual) {
         if (categoriaId == null) {
-            throw new DatosInvalidosException("categoriaId", "Seleccione la categoria del bien.");
+            throw new DatosInvalidosException("categoriaId", "Seleccione la categoría del bien.");
         }
         Categoria categoria = categorias.buscarPorId(categoriaId)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("la categoria", categoriaId));
+                .orElseThrow(() -> RecursoNoEncontradoException.de("la categoría", categoriaId));
 
         boolean yaLaTenia = actual != null && categoriaId.equals(actual.id());
         if (!categoria.isActiva() && !yaLaTenia) {
-            throw new DatosInvalidosException("categoriaId", "La categoria seleccionada esta desactivada.");
+            throw new DatosInvalidosException("categoriaId", "La categoría seleccionada esta desactivada.");
         }
         return categoria.referencia();
+    }
+
+    /**
+     * RF-14: un bien no vuelve al servicio dentro de un laboratorio desactivado.
+     *
+     * <p>Un laboratorio puede desactivarse con bienes dados de baja dentro. Si
+     * uno de ellos se reincorporara ahi, quedaria un bien en servicio en un
+     * lugar que ya no existe, que es justo lo que la desactivacion impide. Como
+     * un bien de baja no se edita, la salida es que el Administrador reactive
+     * el laboratorio antes.</p>
+     */
+    private void exigirLaboratorioEnFuncionamiento(Equipo equipo) {
+        Long laboratorioId = equipo.getLaboratorioId();
+        if (laboratorioId != null
+                && !ubicaciones.laboratorioPerteneceA(laboratorioId, equipo.getCoordinacionId())) {
+            throw new ReglaNegocioException(
+                    "El equipo está ubicado en el laboratorio \""
+                            + nombreLaboratorioODefecto(laboratorioId) + "\", que está desactivado. "
+                            + "Pida al Administrador que lo active antes de reincorporar el equipo.");
+        }
     }
 
     /** RN-12: el laboratorio, si se indica, es de la misma Coordinacion. */
@@ -645,7 +666,7 @@ public class GestionInventarioServicio {
         }
         if (!ubicaciones.laboratorioPerteneceA(laboratorioId, coordinacionId)) {
             throw new DatosInvalidosException("laboratorioId",
-                    "El laboratorio seleccionado no existe, esta desactivado o pertenece a otra coordinacion.");
+                    "El laboratorio seleccionado no existe, esta desactivado o pertenece a otra coordinación.");
         }
         return laboratorioId;
     }

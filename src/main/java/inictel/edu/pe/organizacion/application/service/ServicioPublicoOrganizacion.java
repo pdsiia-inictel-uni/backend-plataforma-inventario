@@ -39,8 +39,8 @@ public class ServicioPublicoOrganizacion {
     }
 
     @Transactional(readOnly = true)
-    public boolean existeCoordinacionActiva(Long coordinacionId) {
-        return coordinaciones.buscarPorId(coordinacionId).map(Coordinacion::isActiva).orElse(false);
+    public boolean existeCoordinacion(Long coordinacionId) {
+        return coordinaciones.buscarPorId(coordinacionId).isPresent();
     }
 
     /** Nombre completo "Coordinacion X - Direccion Y", para encabezados y bitacora. */
@@ -50,7 +50,7 @@ public class ServicioPublicoOrganizacion {
                 .map(coordinacion -> {
                     String direccion = direcciones.buscarPorId(coordinacion.getDireccionId())
                             .map(d -> d.getNombre())
-                            .orElse("Direccion no disponible");
+                            .orElse("Dirección no disponible");
                     return coordinacion.getNombre() + " - " + direccion;
                 });
     }
@@ -86,13 +86,12 @@ public class ServicioPublicoOrganizacion {
     }
 
     /**
-     * RN-12: valida que el laboratorio exista, este activo y pertenezca a la
+     * RN-12: valida que el laboratorio exista y pertenezca a la
      * Coordinacion indicada. Lo consume {@code inventario} al ubicar un bien.
      */
     @Transactional(readOnly = true)
     public boolean laboratorioPerteneceA(Long laboratorioId, Long coordinacionId) {
         return laboratorios.buscarPorId(laboratorioId)
-                .filter(Laboratorio::isActivo)
                 .map(laboratorio -> laboratorio.perteneceA(coordinacionId))
                 .orElse(false);
     }
@@ -109,8 +108,8 @@ public class ServicioPublicoOrganizacion {
      * sin ningun lugar donde estar no se puede encontrar despues.</p>
      */
     @Transactional(readOnly = true)
-    public boolean tieneLaboratoriosActivos(Long coordinacionId) {
+    public boolean tieneLaboratorios(Long coordinacionId) {
         return coordinacionId != null
-                && laboratorios.contarActivosPorCoordinacion(coordinacionId) > 0;
+                && laboratorios.contarPorCoordinacion(coordinacionId) > 0;
     }
 }

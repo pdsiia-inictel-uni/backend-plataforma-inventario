@@ -33,11 +33,8 @@ public class LaboratorioRepositorioJpa implements LaboratorioRepositorio {
     }
 
     @Override
-    public List<Laboratorio> listarPorCoordinacion(Long coordinacionId, boolean soloActivos) {
-        List<LaboratorioJpaEntity> entidades = soloActivos
-                ? jpa.findByCoordinacionIdAndActivoTrueOrderByNombreAsc(coordinacionId)
-                : jpa.findByCoordinacionIdOrderByNombreAsc(coordinacionId);
-        return entidades.stream().map(OrganizacionMapper::aDominio).toList();
+    public List<Laboratorio> listarPorCoordinacion(Long coordinacionId) {
+        return jpa.findByCoordinacionIdOrderByNombreAsc(coordinacionId).stream().map(OrganizacionMapper::aDominio).toList();
     }
 
     @Override
@@ -48,7 +45,7 @@ public class LaboratorioRepositorioJpa implements LaboratorioRepositorio {
     }
 
     @Override
-    public long contarActivosPorCoordinacion(Long coordinacionId) {
-        return jpa.countByCoordinacionIdAndActivoTrue(coordinacionId);
+    public long contarPorCoordinacion(Long coordinacionId) {
+        return jpa.countByCoordinacionId(coordinacionId);
     }
 }

@@ -11,7 +11,7 @@ public final class PoliticaPassword {
 
     public static final int LONGITUD_MINIMA = 8;
     public static final String MENSAJE =
-            "La contrasena debe tener al menos 8 caracteres e incluir letras, numeros y al menos un caracter especial.";
+            "La contraseña debe tener al menos 8 caracteres e incluir letras, números y al menos un carácter especial.";
 
     private PoliticaPassword() {
     }

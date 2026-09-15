@@ -12,11 +12,11 @@ public record CodigoBien(String valor, String campo) {
 
     public CodigoBien {
         if (valor == null || valor.isBlank()) {
-            throw new DatosInvalidosException(campo, "Este codigo es obligatorio.");
+            throw new DatosInvalidosException(campo, "Este código es obligatorio.");
         }
         valor = valor.trim();
         if (valor.length() > LONGITUD_MAXIMA) {
-            throw new DatosInvalidosException(campo, "El codigo no puede superar los 60 caracteres.");
+            throw new DatosInvalidosException(campo, "El código no puede superar los 60 caracteres.");
         }
     }
 

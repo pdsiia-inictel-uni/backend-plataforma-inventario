@@ -55,7 +55,7 @@ public class FormatoUsoController {
     @PostMapping("/{equipoId}/formato-uso")
     @PreAuthorize("hasRole('RESPONSABLE')")
     @Operation(summary = "Genera en PDF el formato de registro de uso de un equipo. "
-            + "No guarda nada ni cambia la condicion del bien (RF-78, RN-36)")
+            + "No guarda nada ni cambia la condición del bien (RF-78, RN-36)")
     public ResponseEntity<byte[]> formatoDeUso(@PathVariable Long equipoId,
                                                @Valid @RequestBody FormatoUsoRequest peticion) {
 

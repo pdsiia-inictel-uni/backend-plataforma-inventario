@@ -27,7 +27,7 @@ public record PersonaResponsable(String nombre, String dni) {
         }
         if (dni == null || !DNI.matcher(dni.trim()).matches()) {
             throw new DatosInvalidosException("dniPersona",
-                    "El DNI debe tener exactamente 8 digitos numericos.");
+                    "El DNI debe tener exactamente 8 dígitos numericos.");
         }
         dni = dni.trim();
     }

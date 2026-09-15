@@ -1,25 +1,21 @@
 package inictel.edu.pe.organizacion.domain.service;
 
 /**
- * Puerto hacia el inventario y los prestamos, necesario para decidir si una
- * Coordinacion o un Laboratorio pueden desactivarse (RF-13, RF-14).
+ * Puerto hacia el inventario, necesario para describir las coordinaciones y
+ * sus laboratorios (RF-12, RF-15).
  *
  * <p>Es una capa anticorrupcion: {@code organizacion} solo pregunta cuantos
  * bienes hay, nunca conoce el agregado Equipo ni sus tablas (RNF-39).</p>
  */
 public interface CensoDeBienes {
 
-    /** Bienes no dados de baja que pertenecen a la Coordinacion. */
-    long bienesActivosEn(Long coordinacionId);
-
-    /** Bienes ubicados en el Laboratorio, sin importar su condicion. */
-    long bienesUbicadosEn(Long laboratorioId);
-
-    /** Prestamos sin devolver de la Coordinacion. */
-    long prestamosVigentesEn(Long coordinacionId);
-
     /** Conteo de bienes por condicion, para el resumen de la estructura (RF-15). */
     ResumenBienes resumenDe(Long coordinacionId);
+
+    /**
+     * RF-12: bienes ubicados en el Laboratorio, por condicion.
+     */
+    ResumenBienes resumenDeLaboratorio(Long laboratorioId);
 
     record ResumenBienes(long operativos, long prestados, long enMantenimiento, long dadosDeBaja) {
 
@@ -29,6 +25,11 @@ public interface CensoDeBienes {
 
         public long total() {
             return operativos + prestados + enMantenimiento + dadosDeBaja;
+        }
+
+        /** Bienes que siguen en servicio: todos salvo los dados de baja. */
+        public long vigentes() {
+            return operativos + prestados + enMantenimiento;
         }
     }
 }

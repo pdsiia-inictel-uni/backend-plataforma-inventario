@@ -26,8 +26,8 @@ public class UbicacionesOrganizacion implements UbicacionesDisponibles {
     }
 
     @Override
-    public boolean tieneLaboratoriosActivos(Long coordinacionId) {
-        return organizacion.tieneLaboratoriosActivos(coordinacionId);
+    public boolean tieneLaboratorios(Long coordinacionId) {
+        return organizacion.tieneLaboratorios(coordinacionId);
     }
 
     @Override

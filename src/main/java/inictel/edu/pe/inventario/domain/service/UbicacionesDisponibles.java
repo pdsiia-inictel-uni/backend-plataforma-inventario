@@ -9,16 +9,16 @@ import java.util.Optional;
 public interface UbicacionesDisponibles {
 
     /**
-     * RN-12: el laboratorio existe, esta activo y pertenece a la Coordinacion
+     * RN-12: el laboratorio existe y pertenece a la Coordinacion
      * indicada. Impide ubicar un bien en un laboratorio ajeno.
      */
     boolean laboratorioPerteneceA(Long laboratorioId, Long coordinacionId);
 
     /**
-     * RN-26: la Coordinacion tiene al menos un laboratorio activo donde ubicar
+     * RN-26: la Coordinacion tiene al menos un laboratorio donde ubicar
      * sus bienes. Sin laboratorios no se registra ningun bien.
      */
-    boolean tieneLaboratoriosActivos(Long coordinacionId);
+    boolean tieneLaboratorios(Long coordinacionId);
 
     Optional<String> nombreDeLaboratorio(Long laboratorioId);
 

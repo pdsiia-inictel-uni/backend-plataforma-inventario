@@ -63,7 +63,7 @@ public class Categoria {
     public void desactivar(long bienesActivos) {
         if (bienesActivos > 0) {
             throw new ReglaNegocioException(
-                    "No se puede desactivar la categoria porque " + bienesActivos
+                    "No se puede desactivar la categoría porque " + bienesActivos
                             + " bien(es) activo(s) la utilizan.");
         }
         this.activa = false;
@@ -76,7 +76,7 @@ public class Categoria {
     private static String exigirNombre(String nombre) {
         String limpio = nombre == null ? "" : nombre.trim();
         if (limpio.isEmpty()) {
-            throw new DatosInvalidosException("nombre", "Ingrese el nombre de la categoria.");
+            throw new DatosInvalidosException("nombre", "Ingrese el nombre de la categoría.");
         }
         if (limpio.length() > MAX_NOMBRE) {
             throw new DatosInvalidosException("nombre", "El nombre no puede superar los 100 caracteres.");
@@ -94,7 +94,7 @@ public class Categoria {
         }
         if (limpio.length() > MAX_DESCRIPCION) {
             throw new DatosInvalidosException("descripcion",
-                    "La descripcion no puede superar los 500 caracteres.");
+                    "La descripción no puede superar los 500 caracteres.");
         }
         return limpio;
     }

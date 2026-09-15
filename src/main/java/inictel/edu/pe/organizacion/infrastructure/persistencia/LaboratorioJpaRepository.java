@@ -9,11 +9,9 @@ public interface LaboratorioJpaRepository extends JpaRepository<LaboratorioJpaEn
 
     List<LaboratorioJpaEntity> findByCoordinacionIdOrderByNombreAsc(Long coordinacionId);
 
-    List<LaboratorioJpaEntity> findByCoordinacionIdAndActivoTrueOrderByNombreAsc(Long coordinacionId);
-
     boolean existsByCoordinacionIdAndNombreIgnoreCase(Long coordinacionId, String nombre);
 
     boolean existsByCoordinacionIdAndNombreIgnoreCaseAndIdNot(Long coordinacionId, String nombre, Long id);
 
-    long countByCoordinacionIdAndActivoTrue(Long coordinacionId);
+    long countByCoordinacionId(Long coordinacionId);
 }

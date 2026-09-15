@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Servicio de host abierto del contexto prestamos: cifras que consumen el panel
- * de control (RF-75 .. RF-77) y la estructura organizacional (RF-13), sin
+ * de control (RF-75 .. RF-77), sin
  * exponer el agregado.
  *
  * <p>Con {@code coordinacionId} nulo las cifras abarcan toda la institucion.</p>
@@ -23,12 +23,6 @@ public class ServicioPublicoPrestamos {
     @Transactional(readOnly = true)
     public long contarActivos(Long coordinacionId) {
         return prestamos.contarActivos(coordinacionId);
-    }
-
-    /** RF-13: una coordinacion con prestamos vivos no puede desactivarse. */
-    @Transactional(readOnly = true)
-    public long contarActivosEn(Long coordinacionId) {
-        return coordinacionId == null ? 0 : prestamos.contarActivos(coordinacionId);
     }
 
     @Transactional(readOnly = true)

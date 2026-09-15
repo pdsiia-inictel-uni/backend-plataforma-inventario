@@ -12,9 +12,9 @@ public interface LaboratorioRepositorio {
 
     Optional<Laboratorio> buscarPorId(Long id);
 
-    List<Laboratorio> listarPorCoordinacion(Long coordinacionId, boolean soloActivos);
+    List<Laboratorio> listarPorCoordinacion(Long coordinacionId);
 
     boolean existeNombreEnCoordinacion(Long coordinacionId, String nombre, Long idActual);
 
-    long contarActivosPorCoordinacion(Long coordinacionId);
+    long contarPorCoordinacion(Long coordinacionId);
 }

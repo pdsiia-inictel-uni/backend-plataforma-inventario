@@ -18,15 +18,9 @@
 -- BCrypt de su contrasena (CuentaInicialInitializer).
 -- ============================================================================
 
-INSERT INTO direccion (nombre, sigla, descripcion, activa) VALUES
-    ('Dirección de Investigación y Desarrollo Tecnológico',
-     'DIDT',
-     'Encargada de planificar y ejecutar proyectos de investigación científica y aplicada en telecomunicaciones y TIC.',
-     TRUE),
-    ('Dirección de Capacitación y Transferencia Tecnológica',
-     'DCTT',
-     'Encargada de los servicios de asesoría, consultoría, transferencia tecnológica y programas de capacitación especializada.',
-     TRUE);
+INSERT INTO direccion (nombre, sigla) VALUES
+    ('Dirección de Investigación y Desarrollo Tecnológico',  'DIDT'),
+    ('Dirección de Capacitación y Transferencia Tecnológica', 'DCTT');
 
 INSERT INTO categoria (nombre, descripcion, activa) VALUES
     ('Equipos de cómputo',  'Computadoras de escritorio, laptops, servidores y periféricos', TRUE),

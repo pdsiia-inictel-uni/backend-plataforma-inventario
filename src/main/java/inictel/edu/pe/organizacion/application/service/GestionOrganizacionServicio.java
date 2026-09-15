@@ -65,7 +65,7 @@ public class GestionOrganizacionServicio {
     private void exigirLecturaDe(Long coordinacionId) {
         if (!contexto.requerido().puedeLeerCoordinacion(coordinacionId)) {
             throw new AccesoDenegadoException(
-                    "No tiene acceso a los datos de otra coordinacion.");
+                    "No tiene acceso a los datos de otra coordinación.");
         }
     }
 
@@ -78,11 +78,11 @@ public class GestionOrganizacionServicio {
      * sola peticion para la pagina principal del Administrador.
      */
     @Transactional(readOnly = true)
-    public EstructuraDto estructura(boolean soloActivas) {
+    public EstructuraDto estructura() {
         List<EstructuraDto.RamaDireccion> ramas = new ArrayList<>();
-        for (Direccion direccion : direcciones.listar(soloActivas)) {
+        for (Direccion direccion : direcciones.listar()) {
             List<CoordinacionDto> hijas = coordinaciones
-                    .listarPorDireccion(direccion.getId(), soloActivas).stream()
+                    .listarPorDireccion(direccion.getId()).stream()
                     .map(coordinacion -> componer(coordinacion, direccion.getNombre()))
                     .toList();
             ramas.add(new EstructuraDto.RamaDireccion(DireccionDto.de(direccion), hijas));
@@ -94,20 +94,20 @@ public class GestionOrganizacionServicio {
     // Direcciones (RF-10)
     //
     // Las direcciones de INICTEL-UNI son dos y estan en su reglamento: se
-    // precargan con el esquema (migracion V4) y la aplicacion no las crea ni
-    // las desactiva. Solo se leen y se corrigen sus datos.
+    // precargan con el esquema (migracion V2) y la aplicacion no las crea ni
+    // las desactiva. Solo se leen y se corrigen su nombre y su sigla.
     // ------------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<DireccionDto> listarDirecciones(boolean soloActivas) {
-        return direcciones.listar(soloActivas).stream().map(DireccionDto::de).toList();
+    public List<DireccionDto> listarDirecciones() {
+        return direcciones.listar().stream().map(DireccionDto::de).toList();
     }
 
     @Transactional
-    public DireccionDto editarDireccion(Long id, String nombre, String sigla, String descripcion) {
+    public DireccionDto editarDireccion(Long id, String nombre, String sigla) {
         Direccion direccion = exigirDireccion(id);
         validarNombreDireccionLibre(nombre, id);
-        direccion.actualizar(nombre, sigla, descripcion);
+        direccion.actualizar(nombre, sigla);
         Direccion guardada = direcciones.guardar(direccion);
 
         return DireccionDto.de(guardada);
@@ -122,15 +122,15 @@ public class GestionOrganizacionServicio {
      * operativo solo se ve a si mismo, que es cuanto necesitan sus selectores.
      */
     @Transactional(readOnly = true)
-    public List<CoordinacionDto> listarCoordinaciones(Long direccionId, boolean soloActivas) {
+    public List<CoordinacionDto> listarCoordinaciones(Long direccionId) {
         UsuarioAutenticado actual = contexto.requerido();
         if (!actual.esAdmin()) {
             return List.of(obtenerCoordinacion(actual.coordinacionRequerida()));
         }
 
         List<Coordinacion> encontradas = direccionId == null
-                ? coordinaciones.listar(soloActivas)
-                : coordinaciones.listarPorDireccion(direccionId, soloActivas);
+                ? coordinaciones.listar()
+                : coordinaciones.listarPorDireccion(direccionId);
 
         return encontradas.stream()
                 .map(coordinacion -> componer(coordinacion, nombreDireccion(coordinacion.getDireccionId())))
@@ -156,14 +156,10 @@ public class GestionOrganizacionServicio {
     public CoordinacionDto crearCoordinacion(Long direccionId, String nombre, String descripcion,
                                              String laboratorioNombre, String laboratorioUbicacion) {
         Direccion direccion = exigirDireccion(direccionId);
-        if (!direccion.isActiva()) {
-            throw new DatosInvalidosException("direccionId",
-                    "La direccion seleccionada esta desactivada.");
-        }
         validarNombreCoordinacionLibre(direccionId, nombre, null);
         if (laboratorioNombre == null || laboratorioNombre.isBlank()) {
             throw new DatosInvalidosException("laboratorioNombre",
-                    "Indique el nombre del primer laboratorio de la coordinacion.");
+                    "Indique el nombre del primer laboratorio de la coordinación.");
         }
 
         Coordinacion coordinacion = coordinaciones.guardar(
@@ -185,49 +181,34 @@ public class GestionOrganizacionServicio {
         return componer(guardada, nombreDireccion(guardada.getDireccionId()));
     }
 
-    /** RF-13: la desactivacion se bloquea si quedan bienes o prestamos vivos. */
-    @Transactional
-    public CoordinacionDto cambiarEstadoCoordinacion(Long id, boolean activa) {
-        Coordinacion coordinacion = exigirCoordinacion(id);
-        if (activa) {
-            coordinacion.activar();
-        } else {
-            coordinacion.desactivar(
-                    censoBienes.bienesActivosEn(id),
-                    censoBienes.prestamosVigentesEn(id));
-        }
-        Coordinacion guardada = coordinaciones.guardar(coordinacion);
-
-        return componer(guardada, nombreDireccion(guardada.getDireccionId()));
-    }
+    // RF-13: una coordinacion no se desactiva, asi que no hay caso de uso que
+    // cambie su estado. Solo se crea y se corrigen sus datos.
 
     // ------------------------------------------------------------------
-    // Laboratorios (RF-12, RF-14)
+    // Laboratorios (RF-12)
+    //
+    // Un laboratorio no se desactiva: se crea y se corrigen sus datos.
     // ------------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<LaboratorioDto> listarLaboratorios(Long coordinacionId, boolean soloActivos) {
+    public List<LaboratorioDto> listarLaboratorios(Long coordinacionId) {
         exigirLecturaDe(coordinacionId);
         exigirCoordinacion(coordinacionId);
-        return laboratorios.listarPorCoordinacion(coordinacionId, soloActivos).stream()
+        return laboratorios.listarPorCoordinacion(coordinacionId).stream()
                 .map(laboratorio -> LaboratorioDto.de(laboratorio,
-                        censoBienes.bienesUbicadosEn(laboratorio.getId())))
+                        censoBienes.resumenDeLaboratorio(laboratorio.getId())))
                 .toList();
     }
 
     @Transactional
     public LaboratorioDto crearLaboratorio(Long coordinacionId, String nombre, String ubicacion) {
-        Coordinacion coordinacion = exigirCoordinacion(coordinacionId);
-        if (!coordinacion.isActiva()) {
-            throw new DatosInvalidosException("coordinacionId",
-                    "La coordinacion seleccionada esta desactivada.");
-        }
+        exigirCoordinacion(coordinacionId);
         validarNombreLaboratorioLibre(coordinacionId, nombre, null);
 
         Laboratorio laboratorio = laboratorios.guardar(
                 Laboratorio.crear(coordinacionId, nombre, ubicacion));
 
-        return LaboratorioDto.de(laboratorio, 0);
+        return LaboratorioDto.de(laboratorio, CensoDeBienes.ResumenBienes.vacio());
     }
 
     @Transactional
@@ -237,23 +218,7 @@ public class GestionOrganizacionServicio {
         laboratorio.actualizar(nombre, ubicacion);
         Laboratorio guardado = laboratorios.guardar(laboratorio);
 
-        return LaboratorioDto.de(guardado, censoBienes.bienesUbicadosEn(guardado.getId()));
-    }
-
-    @Transactional
-    public LaboratorioDto cambiarEstadoLaboratorio(Long id, boolean activo) {
-        Laboratorio laboratorio = exigirLaboratorio(id);
-        if (activo) {
-            laboratorio.activar();
-        } else {
-            // RN-26: la coordinacion nunca se queda sin laboratorios activos.
-            boolean esElUltimo = laboratorio.isActivo()
-                    && laboratorios.contarActivosPorCoordinacion(laboratorio.getCoordinacionId()) <= 1;
-            laboratorio.desactivar(censoBienes.bienesUbicadosEn(id), esElUltimo);
-        }
-        Laboratorio guardado = laboratorios.guardar(laboratorio);
-
-        return LaboratorioDto.de(guardado, censoBienes.bienesUbicadosEn(guardado.getId()));
+        return LaboratorioDto.de(guardado, censoBienes.resumenDeLaboratorio(guardado.getId()));
     }
 
     // ------------------------------------------------------------------
@@ -267,22 +232,22 @@ public class GestionOrganizacionServicio {
                 direccionNombre,
                 censoPersonal.responsableDe(id).orElse(null),
                 censoPersonal.operadoresActivosEn(id),
-                laboratorios.contarActivosPorCoordinacion(id),
+                laboratorios.contarPorCoordinacion(id),
                 censoBienes.resumenDe(id));
     }
 
     private String nombreDireccion(Long direccionId) {
-        return direcciones.buscarPorId(direccionId).map(Direccion::getNombre).orElse("Direccion no disponible");
+        return direcciones.buscarPorId(direccionId).map(Direccion::getNombre).orElse("Dirección no disponible");
     }
 
     private Direccion exigirDireccion(Long id) {
         return direcciones.buscarPorId(id)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("la direccion", id));
+                .orElseThrow(() -> RecursoNoEncontradoException.de("la dirección", id));
     }
 
     private Coordinacion exigirCoordinacion(Long id) {
         return coordinaciones.buscarPorId(id)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("la coordinacion", id));
+                .orElseThrow(() -> RecursoNoEncontradoException.de("la coordinación", id));
     }
 
     private Laboratorio exigirLaboratorio(Long id) {
@@ -292,21 +257,21 @@ public class GestionOrganizacionServicio {
 
     private void validarNombreDireccionLibre(String nombre, Long idActual) {
         if (nombre != null && direcciones.existeNombre(nombre.trim(), idActual)) {
-            throw new DatosInvalidosException("nombre", "Ya existe una direccion con ese nombre.");
+            throw new DatosInvalidosException("nombre", "Ya existe una dirección con ese nombre.");
         }
     }
 
     private void validarNombreCoordinacionLibre(Long direccionId, String nombre, Long idActual) {
         if (nombre != null && coordinaciones.existeNombreEnDireccion(direccionId, nombre.trim(), idActual)) {
             throw new DatosInvalidosException("nombre",
-                    "Ya existe una coordinacion con ese nombre en la misma direccion.");
+                    "Ya existe una coordinación con ese nombre en la misma dirección.");
         }
     }
 
     private void validarNombreLaboratorioLibre(Long coordinacionId, String nombre, Long idActual) {
         if (nombre != null && laboratorios.existeNombreEnCoordinacion(coordinacionId, nombre.trim(), idActual)) {
             throw new DatosInvalidosException("nombre",
-                    "Ya existe un laboratorio con ese nombre en la misma coordinacion.");
+                    "Ya existe un laboratorio con ese nombre en la misma coordinación.");
         }
     }
 }

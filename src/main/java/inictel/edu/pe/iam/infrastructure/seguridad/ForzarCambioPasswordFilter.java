@@ -70,7 +70,7 @@ public class ForzarCambioPasswordFilter extends OncePerRequestFilter {
         RespuestaError error = RespuestaError.de(
                 HttpStatus.FORBIDDEN.value(),
                 CODIGO,
-                "Debe cambiar su contrasena antes de continuar usando el sistema.",
+                "Debe cambiar su contraseña antes de continuar usando el sistema.",
                 request.getRequestURI());
 
         response.setStatus(HttpStatus.FORBIDDEN.value());

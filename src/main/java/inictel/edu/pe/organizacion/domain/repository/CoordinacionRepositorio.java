@@ -12,9 +12,9 @@ public interface CoordinacionRepositorio {
 
     Optional<Coordinacion> buscarPorId(Long id);
 
-    List<Coordinacion> listar(boolean soloActivas);
+    List<Coordinacion> listar();
 
-    List<Coordinacion> listarPorDireccion(Long direccionId, boolean soloActivas);
+    List<Coordinacion> listarPorDireccion(Long direccionId);
 
     boolean existeNombreEnDireccion(Long direccionId, String nombre, Long idActual);
 

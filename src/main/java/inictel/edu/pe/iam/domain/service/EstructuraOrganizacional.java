@@ -6,7 +6,7 @@ import java.util.Optional;
  * Puerto hacia el contexto {@code organizacion}.
  *
  * <p>Capa anticorrupcion: {@code iam} necesita saber si una Coordinacion existe
- * y esta activa para adscribir usuarios, pero no conoce el agregado
+ * para adscribir usuarios, pero no conoce el agregado
  * Coordinacion ni sus tablas (RNF-39).</p>
  */
 public interface EstructuraOrganizacional {
@@ -17,7 +17,7 @@ public interface EstructuraOrganizacional {
      */
     boolean existeAlgunaCoordinacion();
 
-    boolean existeCoordinacionActiva(Long coordinacionId);
+    boolean existeCoordinacion(Long coordinacionId);
 
     /**
      * Nombre de la Coordinacion y de su Direccion, para mensajes, encabezados y

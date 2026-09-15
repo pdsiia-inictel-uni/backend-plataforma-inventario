@@ -10,8 +10,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
-
 /** Representacion persistente del laboratorio (tabla {@code laboratorio}). */
 @Entity
 @Table(name = "laboratorio")
@@ -32,13 +30,4 @@ public class LaboratorioJpaEntity {
 
     @Column(name = "ubicacion", length = 200)
     private String ubicacion;
-
-    @Column(name = "activo", nullable = false)
-    private boolean activo = true;
-
-    @Column(name = "fecha_creacion", nullable = false)
-    private LocalDateTime fechaCreacion;
-
-    @Column(name = "fecha_actualizacion")
-    private LocalDateTime fechaActualizacion;
 }

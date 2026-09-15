@@ -9,8 +9,6 @@ public interface DireccionJpaRepository extends JpaRepository<DireccionJpaEntity
 
     List<DireccionJpaEntity> findAllByOrderByNombreAsc();
 
-    List<DireccionJpaEntity> findByActivaTrueOrderByNombreAsc();
-
     boolean existsByNombreIgnoreCase(String nombre);
 
     boolean existsByNombreIgnoreCaseAndIdNot(String nombre, Long id);
