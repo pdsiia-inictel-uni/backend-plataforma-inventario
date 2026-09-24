@@ -89,8 +89,8 @@ services:
     <<: *registro
     restart: unless-stopped
     ports:
-      - "${PUERTO_HTTP:-80}:8080"
-      - "${PUERTO_HTTPS:-443}:8443"
+      - "${PUERTO_HTTP:-80}:80"
+      - "${PUERTO_HTTPS:-443}:443"
     volumes:
       # El certificado TLS no entra en la imagen: se monta desde el servidor,
       # en solo lectura.
