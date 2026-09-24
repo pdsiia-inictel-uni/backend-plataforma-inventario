@@ -3,40 +3,28 @@ package inictel.edu.pe.reportes.application.service;
 import inictel.edu.pe.compartido.domain.excepcion.AccesoDenegadoException;
 import inictel.edu.pe.compartido.domain.excepcion.RecursoNoEncontradoException;
 import inictel.edu.pe.compartido.domain.seguridad.ContextoUsuario;
-import inictel.edu.pe.compartido.domain.seguridad.UsuarioAutenticado;
 import inictel.edu.pe.inventario.application.dto.EquipoDto;
 import inictel.edu.pe.inventario.application.service.ServicioPublicoInventario;
 import inictel.edu.pe.organizacion.application.service.ServicioPublicoOrganizacion;
 import inictel.edu.pe.organizacion.domain.model.Institucion;
-import inictel.edu.pe.reportes.application.comando.GenerarFormatoUsoComando;
+import inictel.edu.pe.prestamos.application.dto.UsoExternoDto;
+import inictel.edu.pe.prestamos.application.service.ServicioPublicoPrestamos;
 import inictel.edu.pe.reportes.application.dto.ArchivoExportadoDto;
 import inictel.edu.pe.reportes.application.dto.FormatoUsoDto;
 import inictel.edu.pe.reportes.domain.service.GeneradorFormatoUso;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
 /**
- * Formato de registro de uso de equipos de investigacion (RF-78, RF-79).
+ * Formato de registro de uso de equipos de investigacion, en PDF (RF-78).
  *
- * <p>Es el papel que el laboratorio hace firmar cuando un equipo sale a
- * trabajar: quien lo entrega, quien lo usa, en que proyecto, desde cuando y
- * en que estado fue y volvio. El sistema lo rellena con lo que ya sabe del
- * bien y deja en blanco lo que solo saben las personas.</p>
+ * <p>Se dibuja a partir de un registro de uso externo <b>guardado</b>: la
+ * apertura (puntos 1 a 5), el cierre si ya lo tiene (6 a 10) y los datos del
+ * bien (punto 2). Se puede imprimir en cualquier momento; completo, una vez
+ * cerrado, para firmarse a mano (punto 9). Generarlo no escribe nada.</p>
  *
- * <p><b>Genera un documento y nada mas (RN-36).</b> No escribe ninguna fila:
- * ni el formato, ni un movimiento en el historial del bien, ni un prestamo.
- * Tampoco cambia la condicion del equipo, que sigue como estaba —Operativo,
- * si lo estaba— hasta que alguien registre la salida de verdad (RF-59). El
- * documento es un tramite del laboratorio; el prestamo es el registro del
- * sistema, y son dos cosas distintas que la pantalla se encarga de recordar
- * (RF-79).</p>
- *
- * <p>Solo lo genera el <b>Responsable</b>, y solo sobre bienes de su
- * Coordinacion: es quien firma el documento como coordinador (punto 9) y
- * quien responde por el equipo que sale (RF-78, RN-23).</p>
+ * <p>Lo imprime quien puede ver el equipo: el Responsable y los Operadores de
+ * su coordinacion, y el Administrador (RN-23).</p>
  */
 @Service
 public class FormatoUsoServicio {
@@ -44,43 +32,41 @@ public class FormatoUsoServicio {
     /** Punto 1 del formato: el responsable del equipamiento es el Coordinador. */
     private static final String RESPONSABLE_EQUIPAMIENTO = "Coordinador";
 
+    private final ServicioPublicoPrestamos prestamos;
     private final ServicioPublicoInventario inventario;
     private final ServicioPublicoOrganizacion organizacion;
     private final GeneradorFormatoUso generador;
     private final ContextoUsuario contexto;
 
-    public FormatoUsoServicio(ServicioPublicoInventario inventario,
+    public FormatoUsoServicio(ServicioPublicoPrestamos prestamos,
+                              ServicioPublicoInventario inventario,
                               ServicioPublicoOrganizacion organizacion,
                               GeneradorFormatoUso generador,
                               ContextoUsuario contexto) {
+        this.prestamos = prestamos;
         this.inventario = inventario;
         this.organizacion = organizacion;
         this.generador = generador;
         this.contexto = contexto;
     }
 
-    /**
-     * @return el PDF y el nombre con el que se descarga; nada queda guardado
-     */
     @Transactional(readOnly = true)
-    public ArchivoExportadoDto generar(Long equipoId, GenerarFormatoUsoComando datos) {
-        UsuarioAutenticado actual = contexto.requerido();
-        if (!actual.esResponsable()) {
-            throw new AccesoDenegadoException(
-                    "El formato de registro de uso lo emite el responsable de la coordinación.");
+    public ArchivoExportadoDto generar(Long usoId) {
+        UsoExternoDto uso = prestamos.usoExterno(usoId)
+                .orElseThrow(() -> RecursoNoEncontradoException.de("el registro de uso", usoId));
+
+        if (!contexto.requerido().puedeLeerCoordinacion(uso.coordinacionId())) {
+            throw new AccesoDenegadoException("No tiene acceso a los equipos de otra coordinación.");
         }
 
-        EquipoDto equipo = inventario.fichaDe(equipoId)
-                .orElseThrow(() -> RecursoNoEncontradoException.de("el bien", equipoId));
+        EquipoDto equipo = inventario.fichaDe(uso.equipoId())
+                .orElseThrow(() -> RecursoNoEncontradoException.de("el bien", uso.equipoId()));
 
-        // RN-23: un responsable no emite documentos sobre bienes ajenos.
-        actual.exigirAccesoA(equipo.coordinacionId());
+        boolean cerrado = uso.fechaCierre() != null;
 
         FormatoUsoDto formato = new FormatoUsoDto(
+                uso.id(),
                 Institucion.SEDE,
-                // RF-52b: el documento nombra la dependencia entera, de mayor a
-                // menor. Un papel que se firma y se archiva tiene que decir a
-                // que Direccion pertenece el equipo que sale.
                 organizacion.ubicacionDeCoordinacion(equipo.coordinacionId())
                         .map(ServicioPublicoOrganizacion.CoordinacionUbicada::direccion)
                         .orElse(null),
@@ -88,9 +74,9 @@ public class FormatoUsoServicio {
                 equipo.laboratorio(),
 
                 RESPONSABLE_EQUIPAMIENTO,
-                datos.investigadorEncargado(),
-                datos.correoEncargado(),
-                datos.celularEncargado(),
+                uso.encargadoNombre(),
+                uso.encargadoCorreo(),
+                uso.encargadoCelular(),
 
                 equipo.nombre(),
                 equipo.codigoPatrimonial(),
@@ -101,41 +87,36 @@ public class FormatoUsoServicio {
                 equipo.costo(),
                 equipo.fechaAdquisicion(),
                 equipo.coordinacion(),
-                // La condicion que el bien tiene ahora mismo, no la que se
-                // suponga: si esta prestado o en mantenimiento, el documento lo
-                // dice y quien lo firma se entera antes de llevarselo.
-                equipo.condicionEtiqueta(),
+                // La condicion con que el equipo salio, guardada al abrir el uso.
+                uso.estadoEquipoInicio(),
 
-                datos.nombreInvestigador(),
-                datos.correoInvestigador(),
-                datos.telefonoInvestigador(),
+                uso.usuarioNombre(),
+                uso.usuarioCorreo(),
+                uso.usuarioTelefono(),
 
-                datos.proyecto(),
+                uso.proyecto(),
 
-                // RF-78: el uso empieza cuando se emite el documento, con la
-                // hora del servidor. El fin lo escribe quien lo firma.
-                LocalDateTime.now(),
-                datos.fechaFinUso(),
-                datos.horaFinUso(),
-                datos.actividadRealizada(),
+                uso.fechaInicio(),
+                cerrado ? uso.fechaCierre().toLocalDate() : uso.fechaFinPrevista(),
+                cerrado ? uso.fechaCierre().toLocalTime() : uso.horaFinPrevista(),
+                uso.actividad(),
 
-                datos.entregadoOperativo(),
-                datos.devueltoOperativo(),
+                uso.entregadoOperativo(),
+                uso.devueltoOperativo(),
 
-                datos.incidente(),
-                datos.accionCorrectiva(),
+                uso.incidente(),
+                uso.accionCorrectiva(),
 
-                actual.nombreCompleto(),
+                uso.observaciones(),
+                cerrado);
 
-                datos.observaciones());
-
-        return new ArchivoExportadoDto(nombreArchivo(equipo), "application/pdf",
+        return new ArchivoExportadoDto(nombreArchivo(uso, equipo), "application/pdf",
                 generador.generar(formato));
     }
 
-    private String nombreArchivo(EquipoDto equipo) {
+    private String nombreArchivo(UsoExternoDto uso, EquipoDto equipo) {
         String codigo = equipo.codigoInventario() == null ? String.valueOf(equipo.id())
                 : equipo.codigoInventario().replaceAll("[^A-Za-z0-9._-]", "-");
-        return "registro-uso-" + codigo + "-" + LocalDate.now() + ".pdf";
+        return "registro-uso-" + uso.id() + "-" + codigo + ".pdf";
     }
 }

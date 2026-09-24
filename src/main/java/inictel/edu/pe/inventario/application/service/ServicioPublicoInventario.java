@@ -91,6 +91,20 @@ public class ServicioPublicoInventario {
     }
 
     /**
+     * Uso externo anulado: la salida no llego a ocurrir y el bien vuelve a
+     * Operativo, con la revision pendiente que ya tuviera.
+     */
+    @Transactional
+    public void anularPrestamo(Long equipoId, String detalle) {
+        Equipo equipo = exigirEquipo(equipoId);
+        CondicionEquipo anterior = equipo.getCondicion();
+        equipo.anularPrestamo();
+        equipos.guardar(equipo);
+
+        registrarMovimiento(equipo, TipoMovimiento.OPERATIVO, anterior, detalle);
+    }
+
+    /**
      * RF-63, RF-64: el bien vuelve a Operativo; si se reporto dano queda
      * marcado para que el Responsable decida (RN-19).
      */

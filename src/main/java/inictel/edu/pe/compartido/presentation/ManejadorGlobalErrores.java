@@ -19,7 +19,9 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -143,7 +145,23 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<RespuestaError> archivoGrande(MaxUploadSizeExceededException ex, HttpServletRequest req) {
         return construir(HttpStatus.PAYLOAD_TOO_LARGE, "ARCHIVO_MUY_GRANDE",
-                "El archivo supera el tamaño máximo permitido (5 MB).", req, null);
+                "El archivo supera el tamaño máximo permitido (10 MB).", req, null);
+    }
+
+    /** Un endpoint que espera un archivo recibio otro tipo de cuerpo (p. ej. JSON). */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<RespuestaError> tipoNoAdmitido(HttpMediaTypeNotSupportedException ex,
+                                                         HttpServletRequest req) {
+        return construir(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "TIPO_NO_ADMITIDO",
+                "La petición no tiene el formato esperado. Adjunte el archivo solicitado.", req, null);
+    }
+
+    /** Falta la parte "archivo" de una subida multipart. */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<RespuestaError> faltaArchivo(MissingServletRequestPartException ex,
+                                                       HttpServletRequest req) {
+        return construir(HttpStatus.BAD_REQUEST, "DATOS_INVALIDOS", "Adjunte el archivo solicitado.", req,
+                Map.of(ex.getRequestPartName(), "Adjunte el archivo solicitado."));
     }
 
     @ExceptionHandler(Exception.class)

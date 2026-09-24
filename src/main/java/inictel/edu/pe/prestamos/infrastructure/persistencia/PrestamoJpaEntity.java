@@ -55,6 +55,14 @@ public class PrestamoJpaEntity {
     @Column(name = "dni_persona", nullable = false, length = 8)
     private String dniPersona;
 
+    /** RF-59: usuario registrado que se lleva el bien. Nulo solo en prestamos historicos. */
+    @Column(name = "persona_usuario_id")
+    private Long personaUsuarioId;
+
+    /** RF-59: coordinacion de destino, la de la persona que lleva el bien. */
+    @Column(name = "coordinacion_destino_id")
+    private Long coordinacionDestinoId;
+
     @Column(name = "destino", length = 200)
     private String destino;
 

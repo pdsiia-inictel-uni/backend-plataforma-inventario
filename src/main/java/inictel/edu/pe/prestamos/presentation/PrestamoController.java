@@ -2,8 +2,10 @@ package inictel.edu.pe.prestamos.presentation;
 
 import inictel.edu.pe.compartido.domain.CriterioPagina;
 import inictel.edu.pe.compartido.presentation.PaginaResponse;
+import inictel.edu.pe.prestamos.application.dto.DestinatarioDto;
 import inictel.edu.pe.prestamos.application.dto.PrestamoDto;
 import inictel.edu.pe.prestamos.application.service.GestionPrestamosServicio;
+import inictel.edu.pe.prestamos.domain.model.CoordinacionDestino;
 import inictel.edu.pe.prestamos.domain.model.EstadoPrestamo;
 import inictel.edu.pe.prestamos.domain.repository.FiltroPrestamos;
 import inictel.edu.pe.prestamos.presentation.dto.DevolucionRequest;
@@ -69,6 +71,18 @@ public class PrestamoController {
     @Operation(summary = "Prestamos activos que superaron la fecha estimada de devolucion (RF-67)")
     public List<PrestamoDto> vencidos(@RequestParam(required = false) Long coordinacionId) {
         return prestamos.vencidos(coordinacionId);
+    }
+
+    @GetMapping("/coordinaciones-destino")
+    @Operation(summary = "Coordinaciones de destino de un prestamo: todas, de cualquier direccion (RF-59)")
+    public List<CoordinacionDestino> coordinacionesDestino() {
+        return prestamos.coordinacionesDestino();
+    }
+
+    @GetMapping("/destinatarios")
+    @Operation(summary = "Responsables y operadores activos de una coordinacion de destino (RF-59)")
+    public List<DestinatarioDto> destinatarios(@RequestParam Long coordinacionId) {
+        return prestamos.destinatarios(coordinacionId);
     }
 
     @GetMapping("/bien/{equipoId}")

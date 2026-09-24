@@ -41,8 +41,4 @@ public enum CondicionEquipo {
     public String getEtiquetaPrestamos() {
         return etiquetaPrestamos;
     }
-
-    public boolean esPrestable() {
-        return this == OPERATIVO;
-    }
 }

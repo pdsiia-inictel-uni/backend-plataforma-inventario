@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class EquipoTest {
 
+    private static final String ACTA = "/api/archivos/archivos/acta.pdf";
+
     private static final Long COORDINACION = 7L;
     private static final Long OTRA_COORDINACION = 9L;
     private static final Long LABORATORIO = 3L;
@@ -34,7 +36,7 @@ class EquipoTest {
                 COORDINACION, LABORATORIO, "Laptop", "Dell", "E5470",
                 new NumeroSerie("SN-001"),
                 CodigoBien.inventario("INV-001"),
-                CodigoBien.patrimonial("PAT-001"),
+                CodigoBien.patrimonial("000000000001"),
                 new ReferenciaCategoria(1L, "Equipos de computo"),
                 ADQUIRIDO, new BigDecimal("3500.00"), "Sin novedad",
                 RESPONSABLE, OPERADOR);
@@ -45,7 +47,7 @@ class EquipoTest {
                 COORDINACION, LABORATORIO, "Laptop", "Dell", "E5470",
                 new NumeroSerie("SN-009"),
                 CodigoBien.inventario("INV-009"),
-                CodigoBien.patrimonial("PAT-009"),
+                CodigoBien.patrimonial("000000000009"),
                 new ReferenciaCategoria(1L, "Equipos de computo"),
                 fecha, new BigDecimal("3500.00"), null,
                 RESPONSABLE, OPERADOR);
@@ -84,7 +86,7 @@ class EquipoTest {
                     null, null, "Laptop", "Dell", "E5470",
                     new NumeroSerie("SN-002"),
                     CodigoBien.inventario("INV-002"),
-                    CodigoBien.patrimonial("PAT-002"),
+                    CodigoBien.patrimonial("000000000002"),
                     new ReferenciaCategoria(1L, "Equipos de computo"),
                     ADQUIRIDO, BigDecimal.TEN, null, RESPONSABLE, OPERADOR))
                     .isInstanceOf(DatosInvalidosException.class);
@@ -133,7 +135,7 @@ class EquipoTest {
                     COORDINACION, null, "Laptop", "Dell", "E5470",
                     new NumeroSerie("SN-004"),
                     CodigoBien.inventario("INV-004"),
-                    CodigoBien.patrimonial("PAT-004"),
+                    CodigoBien.patrimonial("000000000004"),
                     new ReferenciaCategoria(1L, "Equipos de computo"),
                     ADQUIRIDO, new BigDecimal("-1"), null, RESPONSABLE, OPERADOR))
                     .isInstanceOf(DatosInvalidosException.class)
@@ -153,7 +155,7 @@ class EquipoTest {
                     COORDINACION, null, "Laptop", "  ", "E5470",
                     new NumeroSerie("SN-005"),
                     CodigoBien.inventario("INV-005"),
-                    CodigoBien.patrimonial("PAT-005"),
+                    CodigoBien.patrimonial("000000000005"),
                     new ReferenciaCategoria(1L, "Equipos de computo"),
                     ADQUIRIDO, BigDecimal.TEN, null, RESPONSABLE, OPERADOR))
                     .isInstanceOf(DatosInvalidosException.class);
@@ -230,7 +232,7 @@ class EquipoTest {
     }
 
     @Nested
-    @DisplayName("Condicion, baja y reincorporacion (RN-17, RNF-47)")
+    @DisplayName("Condicion y baja (RN-17, RNF-47)")
     class CicloDeVida {
 
         @Test
@@ -238,7 +240,7 @@ class EquipoTest {
         void noSeDaDeBajaUnBienPrestado() {
             Equipo equipo = unEquipo();
             equipo.marcarComoPrestado();
-            assertThatThrownBy(() -> equipo.darDeBaja("Obsoleto"))
+            assertThatThrownBy(() -> equipo.darDeBaja(ACTA))
                     .isInstanceOf(ReglaNegocioException.class)
                     .hasMessageContaining("devolución");
         }
@@ -254,52 +256,52 @@ class EquipoTest {
         }
 
         @Test
-        @DisplayName("RF-42: la baja exige motivo y es logica")
-        void bajaExigeMotivo() {
+        @DisplayName("RF-42: la baja exige el documento PDF y es logica")
+        void bajaExigeDocumento() {
             Equipo equipo = unEquipo();
             assertThatThrownBy(() -> equipo.darDeBaja("   "))
                     .isInstanceOf(DatosInvalidosException.class);
 
-            equipo.darDeBaja("Equipo obsoleto");
+            equipo.darDeBaja("/api/archivos/archivos/acta.pdf");
             assertThat(equipo.isActivo()).isFalse();
             assertThat(equipo.getCondicion()).isEqualTo(CondicionEquipo.BAJA);
-            assertThat(equipo.getMotivoBaja()).isEqualTo("Equipo obsoleto");
+            assertThat(equipo.getDocumentoBajaUrl()).isEqualTo("/api/archivos/archivos/acta.pdf");
             assertThat(equipo.getFechaBaja()).isNotNull();
         }
 
         @Test
-        @DisplayName("RF-40: un bien de baja no se edita hasta reincorporarlo")
+        @DisplayName("RF-40: un bien de baja no se edita")
         void bienDeBajaNoSeEdita() {
             Equipo equipo = unEquipo();
-            equipo.darDeBaja("Obsoleto");
+            equipo.darDeBaja(ACTA);
 
             assertThatThrownBy(() -> equipo.actualizarDatos(
                     null, "Otro", "HP", "X", new NumeroSerie("SN-9"),
-                    CodigoBien.inventario("INV-9"), CodigoBien.patrimonial("PAT-9"),
+                    CodigoBien.inventario("INV-9"), CodigoBien.patrimonial("000000000009"),
                     new ReferenciaCategoria(1L, "Equipos de computo"),
                     ADQUIRIDO, BigDecimal.TEN, null))
                     .isInstanceOf(ReglaNegocioException.class)
-                    .hasMessageContaining("reincorporarlo");
+                    .hasMessageContaining("definitiva");
         }
 
         @Test
-        @DisplayName("RF-43: la reincorporacion devuelve el bien a operativo")
-        void reincorporacion() {
+        @DisplayName("RF-42: la baja es definitiva y el bien no vuelve al servicio")
+        void laBajaEsDefinitiva() {
             Equipo equipo = unEquipo();
-            equipo.darDeBaja("Obsoleto");
-            equipo.reincorporar();
+            equipo.darDeBaja(ACTA);
 
-            assertThat(equipo.isActivo()).isTrue();
-            assertThat(equipo.getCondicion()).isEqualTo(CondicionEquipo.OPERATIVO);
-            assertThat(equipo.getMotivoBaja()).isNull();
-            assertThat(equipo.getFechaBaja()).isNull();
+            assertThatThrownBy(() -> equipo.darDeBaja(ACTA))
+                    .isInstanceOf(ReglaNegocioException.class);
+            assertThatThrownBy(equipo::marcarComoPrestado)
+                    .isInstanceOf(ReglaNegocioException.class);
+            assertThat(equipo.isActivo()).isFalse();
         }
 
         @Test
         @DisplayName("Un bien de baja no puede prestarse")
         void bienDeBajaNoSePresta() {
             Equipo equipo = unEquipo();
-            equipo.darDeBaja("Obsoleto");
+            equipo.darDeBaja(ACTA);
             assertThatThrownBy(equipo::marcarComoPrestado)
                     .isInstanceOf(ReglaNegocioException.class)
                     .hasMessageContaining("dado de baja");
@@ -336,7 +338,7 @@ class EquipoTest {
 
             assertThatCode(() -> equipo.actualizarDatos(
                     null, "Laptop renombrada", "Dell", "E5470", new NumeroSerie("SN-001"),
-                    CodigoBien.inventario("INV-001"), CodigoBien.patrimonial("PAT-001"),
+                    CodigoBien.inventario("INV-001"), CodigoBien.patrimonial("000000000001"),
                     new ReferenciaCategoria(1L, "Equipos de computo"),
                     ADQUIRIDO, new BigDecimal("3500.00"), "Actualizado"))
                     .doesNotThrowAnyException();
@@ -411,7 +413,7 @@ class EquipoTest {
         void laBajaLoSuelta() {
             Equipo equipo = unEquipo();
             equipo.ponerACargoDe(OPERADOR);
-            equipo.darDeBaja("Obsoleto");
+            equipo.darDeBaja(ACTA);
 
             assertThat(equipo.getResponsableEquipoId()).isNull();
         }
@@ -420,7 +422,7 @@ class EquipoTest {
         @DisplayName("Un bien dado de baja no admite responsable")
         void elBienDeBajaNoSeEntrega() {
             Equipo equipo = unEquipo();
-            equipo.darDeBaja("Obsoleto");
+            equipo.darDeBaja(ACTA);
 
             assertThatThrownBy(() -> equipo.ponerACargoDe(OPERADOR))
                     .isInstanceOf(ReglaNegocioException.class);

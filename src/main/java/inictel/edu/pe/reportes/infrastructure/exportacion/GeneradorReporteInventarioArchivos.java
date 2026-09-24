@@ -31,7 +31,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Adaptador que materializa el inventario filtrado en Excel, CSV y PDF (RF-23).
@@ -278,7 +277,8 @@ public class GeneradorReporteInventarioArchivos implements GeneradorReporteInven
                 texto(e.responsableEquipo()),
                 e.fechaRegistro() != null ? e.fechaRegistro().format(FECHA) : "",
                 texto(e.registradoPor()),
-                texto(e.motivoBaja())
+                // La baja se sustenta con un PDF; motivo_baja solo si no hay documento.
+                e.documentoBajaUrl() != null ? "Documento PDF adjunto" : texto(e.motivoBaja())
         };
     }
 

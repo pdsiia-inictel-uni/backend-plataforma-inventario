@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -42,7 +43,8 @@ public record EquipoRequest(
         String codigoInventario,
 
         @NotBlank(message = "Ingrese el codigo patrimonial.")
-        @Size(max = 60, message = "El codigo patrimonial no puede superar los 60 caracteres.")
+        @Pattern(regexp = "^\\s*[A-Za-z0-9]{12}\\s*$",
+                message = "El código patrimonial debe tener exactamente 12 caracteres, solo letras y números.")
         String codigoPatrimonial,
 
         @NotNull(message = "Seleccione la categoria del bien.")

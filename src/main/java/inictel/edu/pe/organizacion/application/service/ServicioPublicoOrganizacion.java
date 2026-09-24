@@ -8,7 +8,11 @@ import inictel.edu.pe.organizacion.domain.repository.LaboratorioRepositorio;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Cara publica del contexto {@code organizacion} hacia los demas contextos.
@@ -83,6 +87,31 @@ public class ServicioPublicoOrganizacion {
 
     /** Nombre de una Coordinacion junto al de su Direccion. */
     public record CoordinacionUbicada(String nombre, String direccion) {
+    }
+
+    /**
+     * RF-59: todas las Coordinaciones de la institucion, de todas sus
+     * Direcciones, ordenadas por Direccion y por nombre.
+     *
+     * <p>Solo lleva identificador y nombres: la consumen los prestamos para
+     * elegir la coordinacion de destino, y nada de ella revela el inventario
+     * ni el personal de otra coordinacion (RN-23).</p>
+     */
+    @Transactional(readOnly = true)
+    public List<CoordinacionConDireccion> listarCoordinacionesConDireccion() {
+        Map<Long, String> nombresDireccion = direcciones.listar().stream()
+                .collect(Collectors.toMap(d -> d.getId(), d -> d.getNombre()));
+        return coordinaciones.listar().stream()
+                .map(c -> new CoordinacionConDireccion(c.getId(), c.getNombre(), c.getDireccionId(),
+                        nombresDireccion.get(c.getDireccionId())))
+                .sorted(Comparator.comparing((CoordinacionConDireccion c) ->
+                                c.direccionNombre() == null ? "" : c.direccionNombre())
+                        .thenComparing(CoordinacionConDireccion::nombre))
+                .toList();
+    }
+
+    /** Coordinacion con su Direccion, en datos planos (RNF-39). */
+    public record CoordinacionConDireccion(Long id, String nombre, Long direccionId, String direccionNombre) {
     }
 
     /**

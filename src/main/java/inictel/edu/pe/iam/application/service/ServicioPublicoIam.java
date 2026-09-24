@@ -5,6 +5,8 @@ import inictel.edu.pe.iam.domain.repository.UsuarioRepositorio;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -27,11 +29,6 @@ public class ServicioPublicoIam {
     @Transactional(readOnly = true)
     public long contarUsuariosActivos() {
         return usuarios.contarActivos();
-    }
-
-    @Transactional(readOnly = true)
-    public long contarUsuariosActivosEn(Long coordinacionId) {
-        return usuarios.contarActivosEn(coordinacionId);
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +75,47 @@ public class ServicioPublicoIam {
                 .filter(Usuario::estaActiva)
                 .filter(u -> u.getCoordinaciones().contains(coordinacionId))
                 .isPresent();
+    }
+
+    /**
+     * RF-59: Responsable y Operadores activos de una Coordinacion, el
+     * Responsable primero. Lo consume {@code prestamos}: un equipo solo se
+     * presta a una persona registrada de la coordinacion de destino.
+     */
+    @Transactional(readOnly = true)
+    public List<PersonaOperativaDto> personalOperativoDe(Long coordinacionId) {
+        if (coordinacionId == null) {
+            return List.of();
+        }
+        return usuarios.listarPorCoordinacion(coordinacionId, true).stream()
+                .filter(u -> u.esResponsable() || u.esOperador())
+                .sorted(Comparator.comparing((Usuario u) -> !u.esResponsable())
+                        .thenComparing(Usuario::nombreCompleto))
+                .map(ServicioPublicoIam::operativa)
+                .toList();
+    }
+
+    /** RF-59: la persona, si es un Responsable u Operador activo con coordinacion. */
+    @Transactional(readOnly = true)
+    public Optional<PersonaOperativaDto> personalOperativo(Long usuarioId) {
+        if (usuarioId == null) {
+            return Optional.empty();
+        }
+        return usuarios.buscarPorId(usuarioId)
+                .filter(Usuario::estaActiva)
+                .filter(u -> u.esResponsable() || u.esOperador())
+                .filter(u -> u.getCoordinacion() != null)
+                .map(ServicioPublicoIam::operativa);
+    }
+
+    private static PersonaOperativaDto operativa(Usuario u) {
+        return new PersonaOperativaDto(u.getId(), u.nombreCompleto(), u.getDni().valor(),
+                u.getRol().getEtiqueta(), u.getCoordinacion());
+    }
+
+    /** Persona con puesto operativo, en datos planos (RNF-39). */
+    public record PersonaOperativaDto(Long id, String nombreCompleto, String dni,
+                                      String rolEtiqueta, Long coordinacionId) {
     }
 
     /** Datos publicos del Responsable de una Coordinacion. */

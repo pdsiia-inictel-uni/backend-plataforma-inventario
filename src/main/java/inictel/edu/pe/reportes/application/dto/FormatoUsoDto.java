@@ -8,23 +8,21 @@ import java.time.LocalTime;
 /**
  * El formato de registro de uso, listo para imprimirse (RF-78).
  *
- * <p>Reune las dos mitades del documento: la que el sistema conoce del bien
- * —puntos 1 y 2, y la condicion en que esta ahora mismo— y la que escribio
- * quien lo genera. El generador no consulta nada mas: recibe el documento
- * entero y solo decide como se dibuja.</p>
- *
- * <p>Este objeto no se persiste en ninguna tabla. Vive lo que dura la
- * peticion (RN-36).</p>
+ * <p>Reune lo que el sistema sabe del bien —punto 2— con lo que quedo
+ * guardado en el registro de uso externo: su apertura (puntos 1, 3, 4 y 5) y,
+ * si ya se cerro, su cierre (puntos 6, 7, 8 y 10). El punto 9, las firmas,
+ * sale en blanco para firmarse a mano. El generador no consulta nada mas.</p>
  */
 public record FormatoUsoDto(
 
         // Cabecera
+        Long numeroRegistro,
         String sede,
         String direccion,
         String coordinacion,
         String laboratorio,
 
-        // 1. Responsable del equipamiento
+        // 1. Responsable del equipamiento (Coordinador) e investigador encargado
         String responsableEquipamiento,
         String investigadorEncargado,
         String correoEncargado,
@@ -50,7 +48,7 @@ public record FormatoUsoDto(
         // 4. Proyecto asociado y actividad
         String proyecto,
 
-        // 5. Registro de uso
+        // 5. Registro de uso: fin real si ya se cerro, previsto si no
         LocalDateTime inicioUso,
         LocalDate fechaFinUso,
         LocalTime horaFinUso,
@@ -64,9 +62,9 @@ public record FormatoUsoDto(
         String incidente,
         String accionCorrectiva,
 
-        // 9. Firmas
-        String coordinadorQueFirma,
-
         // 10. Observaciones generales
-        String observaciones) {
+        String observaciones,
+
+        /** El registro ya tiene su parte final; si no, el documento lo advierte. */
+        boolean cerrado) {
 }

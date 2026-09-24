@@ -179,18 +179,17 @@ public class EquipoController {
         return inventario.devolverAOperativo(id, peticion == null ? null : peticion.motivo());
     }
 
-    @PostMapping("/{id}/baja")
+    @PostMapping(value = "/{id}/baja", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('RESPONSABLE')")
-    @Operation(summary = "Da de baja un bien. Baja logica con motivo (RF-42)")
-    public EquipoDto darDeBaja(@PathVariable Long id, @Valid @RequestBody MotivoRequest peticion) {
-        return inventario.darDeBaja(id, peticion.motivo());
-    }
-
-    @PostMapping("/{id}/reincorporar")
-    @PreAuthorize("hasRole('RESPONSABLE')")
-    @Operation(summary = "Reincorpora al inventario un bien dado de baja (RF-43)")
-    public EquipoDto reincorporar(@PathVariable Long id, @Valid @RequestBody MotivoRequest peticion) {
-        return inventario.reincorporar(id, peticion.motivo());
+    @Operation(summary = "Da de baja un bien de forma definitiva. multipart/form-data, parte 'archivo': "
+            + "el PDF que sustenta la baja (RF-42)")
+    public EquipoDto darDeBaja(@PathVariable Long id, @RequestPart("archivo") MultipartFile archivo) {
+        try {
+            return inventario.darDeBaja(id, archivo.getOriginalFilename(), archivo.getContentType(),
+                    archivo.getSize(), archivo.getInputStream());
+        } catch (IOException ex) {
+            throw new UncheckedIOException("No se pudo leer el archivo recibido.", ex);
+        }
     }
 
     /**

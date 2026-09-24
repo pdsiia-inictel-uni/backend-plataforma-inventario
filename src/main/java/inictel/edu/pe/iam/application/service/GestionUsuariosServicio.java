@@ -383,7 +383,16 @@ public class GestionUsuariosServicio {
 
             usuario.darDeBaja();
         } else {
+            Long coordinacionAnterior = usuario.getUltimaCoordinacion();
+            boolean vuelveConSuResponsable = fueOperadorDeLaSuya(usuario, contexto.requerido());
             usuario.reincorporar();
+            // El Responsable solo gestiona a los operadores de su coordinacion:
+            // si la reincorporacion dejara a la persona sin puesto, saldria de
+            // su lista y no podria volver a asignarla. Cuando es el quien la
+            // reincorpora, vuelve como operador de su coordinacion.
+            if (vuelveConSuResponsable) {
+                usuario.asignarA(coordinacionAnterior, Rol.OPERADOR);
+            }
         }
 
         return componer(usuarios.guardar(usuario));
@@ -614,7 +623,13 @@ public class GestionUsuariosServicio {
                                 id, ubicacion.coordinacion(), ubicacion.direccion()))
                         .orElseGet(() -> new UsuarioDto.CoordinacionAsignada(id, null, null)))
                 .toList();
-        return UsuarioDto.de(usuario, asignadas);
+        Long ultima = usuario.getUltimaCoordinacion();
+        UsuarioDto.CoordinacionAsignada ultimaCoordinacion = ultima == null ? null
+                : estructura.ubicacionDeCoordinacion(ultima)
+                        .map(ubicacion -> new UsuarioDto.CoordinacionAsignada(
+                                ultima, ubicacion.coordinacion(), ubicacion.direccion()))
+                        .orElseGet(() -> new UsuarioDto.CoordinacionAsignada(ultima, null, null));
+        return UsuarioDto.de(usuario, asignadas, ultimaCoordinacion);
     }
 
     private String nombreCoordinacion(Long coordinacionId) {
@@ -650,7 +665,8 @@ public class GestionUsuariosServicio {
             return;
         }
         boolean compartenCoordinacion = usuario.getCoordinaciones().stream()
-                .anyMatch(actual::puedeLeerCoordinacion);
+                .anyMatch(actual::puedeLeerCoordinacion)
+                || fueOperadorDeLaSuya(usuario, actual);
         if (!compartenCoordinacion) {
             throw new AccesoDenegadoException("No tiene acceso a los datos de otra coordinación.");
         }
@@ -725,11 +741,26 @@ public class GestionUsuariosServicio {
         if (!actual.esResponsable()) {
             throw new AccesoDenegadoException("No tiene permisos para gestionar usuarios.");
         }
+        if (fueOperadorDeLaSuya(objetivo, actual)) {
+            return;
+        }
         boolean suyo = objetivo.getCoordinaciones().stream().anyMatch(actual::puedeLeerCoordinacion);
         if (!objetivo.esOperador() || !suyo) {
             throw new AccesoDenegadoException(
                     "Solo puede gestionar a los operadores de su coordinación.");
         }
+    }
+
+    /**
+     * RN-34: la persona era Operador de la Coordinacion de quien consulta y
+     * se dio de baja. La baja le borro la asignacion, pero sigue siendo "de
+     * los suyos": su Responsable la ve en su lista y puede reincorporarla.
+     */
+    private boolean fueOperadorDeLaSuya(Usuario usuario, UsuarioAutenticado actual) {
+        return actual.esResponsable()
+                && usuario.getUltimoRol() == Rol.OPERADOR
+                && usuario.dejoLaCoordinacion(usuario.getUltimaCoordinacion())
+                && actual.puedeLeerCoordinacion(usuario.getUltimaCoordinacion());
     }
 
     private Usuario exigirUsuario(Long id) {

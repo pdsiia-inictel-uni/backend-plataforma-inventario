@@ -18,6 +18,9 @@ public record PrestamoDto(
         String equipoNumeroSerie,
         String nombrePersona,
         String dniPersona,
+        /** RF-59: usuario registrado que se lleva el bien; nulo en prestamos historicos. */
+        Long personaUsuarioId,
+        Long coordinacionDestinoId,
         String destino,
         LocalDateTime fechaPrestamo,
         LocalDate fechaEstimadaDevolucion,
@@ -45,6 +48,8 @@ public record PrestamoDto(
                 p.getBien().numeroSerie(),
                 p.getPersona().nombre(),
                 p.getPersona().dni(),
+                p.getPersona().usuarioId(),
+                p.getPersona().coordinacionId(),
                 p.getDestino(),
                 p.getFechaPrestamo(),
                 p.getFechaEstimadaDevolucion(),

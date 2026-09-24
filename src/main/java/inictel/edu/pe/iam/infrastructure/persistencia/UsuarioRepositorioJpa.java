@@ -136,11 +136,6 @@ public class UsuarioRepositorioJpa implements UsuarioRepositorio {
     }
 
     @Override
-    public long contarActivosEn(Long coordinacionId) {
-        return coordinacionId == null ? 0 : jpa.contarActivosEnCoordinacion(coordinacionId);
-    }
-
-    @Override
     public boolean estaVacio() {
         return jpa.count() == 0;
     }

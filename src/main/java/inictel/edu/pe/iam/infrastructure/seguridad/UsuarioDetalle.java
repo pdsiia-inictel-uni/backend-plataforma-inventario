@@ -21,10 +21,6 @@ public class UsuarioDetalle implements UserDetails {
         this.usuario = usuario;
     }
 
-    public Usuario getUsuario() {
-        return usuario;
-    }
-
     public Long getId() {
         return usuario.getId();
     }

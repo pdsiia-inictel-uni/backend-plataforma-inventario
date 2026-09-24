@@ -110,7 +110,8 @@ public class GeneradorFormatoUsoPdf implements GeneradorFormatoUso {
             documento.add(datos(
                     campo("Fecha de inicio del uso", fecha(f.inicioUso().toLocalDate())),
                     campo("Hora", hora(f.inicioUso().toLocalTime())),
-                    campo("Fecha de fin del uso", fecha(f.fechaFinUso())),
+                    campo(f.cerrado() ? "Fecha de fin del uso" : "Fecha de fin prevista",
+                            fecha(f.fechaFinUso())),
                     campo("Hora", hora(f.horaFinUso()))));
             documento.add(rotulo("Actividad realizada:"));
             documento.add(caja(f.actividadRealizada(), 3));
@@ -132,13 +133,13 @@ public class GeneradorFormatoUsoPdf implements GeneradorFormatoUso {
 
             // 9. Firmas.
             documento.add(seccion("9.  Autorizaciones y Firmas"));
-            documento.add(firmas(f.coordinadorQueFirma()));
+            documento.add(firmas());
 
             // 10. Observaciones generales.
             documento.add(seccion("10.  Observaciones Generales"));
             documento.add(caja(f.observaciones(), 3));
 
-            documento.add(pie());
+            documento.add(pie(f));
 
             documento.close();
             return salida.toByteArray();
@@ -288,27 +289,26 @@ public class GeneradorFormatoUsoPdf implements GeneradorFormatoUso {
     /**
      * Punto 9: las dos firmas.
      *
-     * <p>La del coordinador lleva impreso el nombre de quien emite el
-     * documento —es quien responde por el equipo— y la del investigador queda
-     * en blanco, porque la escribe quien se lo lleva.</p>
+     * <p>Las dos quedan en blanco: no se imprime ningun nombre bajo la
+     * linea de firma.</p>
      */
-    private PdfPTable firmas(String coordinador) throws Exception {
+    private PdfPTable firmas() throws Exception {
         PdfPTable tabla = new PdfPTable(2);
         tabla.setWidthPercentage(100);
         tabla.setWidths(new float[]{1f, 1f});
         tabla.setSpacingBefore(6f);
 
-        tabla.addCell(bloqueFirma("Firma del coordinador", texto(coordinador)));
-        tabla.addCell(bloqueFirma("Firma del investigador", ""));
+        tabla.addCell(bloqueFirma("Firma del coordinador"));
+        tabla.addCell(bloqueFirma("Firma del investigador"));
         return tabla;
     }
 
-    private PdfPCell bloqueFirma(String rotulo, String nombre) {
+    private PdfPCell bloqueFirma(String rotulo) {
         Paragraph contenido = new Paragraph();
         contenido.add(new Phrase("\n\n\n", VALOR));
         contenido.add(new Phrase("____________________________\n", VALOR));
         contenido.add(new Phrase(rotulo + "\n", ETIQUETA));
-        contenido.add(new Phrase((nombre.isBlank() ? " " : nombre) + "\n", VALOR));
+        contenido.add(new Phrase(" \n", VALOR));
         contenido.add(new Phrase("Fecha:  ____ / ____ / ________", VALOR));
 
         PdfPCell celda = new PdfPCell(contenido);
@@ -318,18 +318,14 @@ public class GeneradorFormatoUsoPdf implements GeneradorFormatoUso {
         return celda;
     }
 
-    /**
-     * Pie del documento.
-     *
-     * <p>Dice lo que este papel no es: el formato acompania la salida fisica
-     * del equipo, y el prestamo se registra aparte en el sistema (RF-79).</p>
-     */
-    private Paragraph pie() {
+    /** Pie del documento: de que registro sale y si ya tiene su parte final. */
+    private Paragraph pie(FormatoUsoDto f) {
         LocalDateTime ahora = LocalDateTime.now();
         Paragraph parrafo = new Paragraph(
-                "Documento generado por el Sistema de Gestión de Inventarios de INICTEL-UNI el "
-                        + ahora.format(FECHA) + " a las " + ahora.format(HORA)
-                        + ".  No sustituye al registro del préstamo en el sistema.", PIE);
+                "Registro de uso N.º " + f.numeroRegistro()
+                        + (f.cerrado() ? " (cerrado)" : " (en curso: puntos 6 a 10 pendientes)")
+                        + ".  Generado por el Sistema de Gestión de Inventarios de INICTEL-UNI el "
+                        + ahora.format(FECHA) + " a las " + ahora.format(HORA) + ".", PIE);
         parrafo.setAlignment(Element.ALIGN_CENTER);
         parrafo.setSpacingBefore(10f);
         return parrafo;

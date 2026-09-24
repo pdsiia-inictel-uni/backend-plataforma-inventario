@@ -42,9 +42,4 @@ public enum EstadoCuenta {
     public boolean permiteEntrar() {
         return this == ACTIVA;
     }
-
-    /** La persona sigue en la institucion. */
-    public boolean sigueEnLaInstitucion() {
-        return this != BAJA;
-    }
 }

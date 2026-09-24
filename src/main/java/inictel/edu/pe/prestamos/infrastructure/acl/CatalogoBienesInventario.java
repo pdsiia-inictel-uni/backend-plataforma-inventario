@@ -50,6 +50,11 @@ public class CatalogoBienesInventario implements CatalogoBienes {
     }
 
     @Override
+    public void anularPrestamo(Long equipoId, String detalle) {
+        inventario.anularPrestamo(equipoId, detalle);
+    }
+
+    @Override
     public void registrarRetorno(Long equipoId, boolean reportaDano, String detalle) {
         inventario.registrarRetorno(equipoId, reportaDano, detalle);
     }

@@ -2,29 +2,28 @@ package inictel.edu.pe.prestamos.presentation.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import inictel.edu.pe.prestamos.application.comando.RegistrarPrestamoComando;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-/** Registro de la salida de un bien (RF-24). */
+/**
+ * Registro de la salida de un bien (RF-59).
+ *
+ * <p>Primero se elige la coordinacion de destino y, dentro de ella, al
+ * Responsable u Operador que se lleva el equipo. El cliente no envia nombres
+ * ni DNI: el servidor los toma de la persona registrada.</p>
+ */
 public record PrestamoRequest(
 
         @NotNull(message = "Seleccione el bien a prestar.")
         Long equipoId,
 
-        @NotBlank(message = "Ingrese el nombre completo de la persona que lleva el bien.")
-        @Size(max = 200, message = "El nombre no puede superar los 200 caracteres.")
-        String nombrePersona,
+        @NotNull(message = "Seleccione la coordinación de destino.")
+        Long coordinacionDestinoId,
 
-        @NotBlank(message = "Ingrese el DNI de la persona.")
-        @Pattern(regexp = "^[0-9]{8}$", message = "El DNI debe tener exactamente 8 digitos numericos.")
-        String dniPersona,
-
-        @Size(max = 200, message = "El destino no puede superar los 200 caracteres.")
-        String destino,
+        @NotNull(message = "Seleccione a la persona que recibe el equipo.")
+        Long personaUsuarioId,
 
         @JsonFormat(pattern = "yyyy-MM-dd")
         LocalDate fechaEstimadaDevolucion,
@@ -33,7 +32,7 @@ public record PrestamoRequest(
         String observacionesSalida) {
 
     public RegistrarPrestamoComando aComando() {
-        return new RegistrarPrestamoComando(equipoId, nombrePersona, dniPersona, destino,
+        return new RegistrarPrestamoComando(equipoId, coordinacionDestinoId, personaUsuarioId,
                 fechaEstimadaDevolucion, observacionesSalida);
     }
 }

@@ -30,6 +30,8 @@ public record EquipoDto(
         String fotoUrl,
         boolean revisionPendiente,
         String motivoBaja,
+        /** RF-42: URL del PDF que sustenta la baja. */
+        String documentoBajaUrl,
         LocalDateTime fechaBaja,
         Long responsableId,
         String responsable,
@@ -73,6 +75,7 @@ public record EquipoDto(
                 e.getFotoUrl(),
                 e.isRevisionPendiente(),
                 e.getMotivoBaja(),
+                e.getDocumentoBajaUrl(),
                 e.getFechaBaja(),
                 e.getResponsableId(),
                 responsable,

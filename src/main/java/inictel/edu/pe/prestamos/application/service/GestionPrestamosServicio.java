@@ -3,25 +3,31 @@ package inictel.edu.pe.prestamos.application.service;
 import inictel.edu.pe.compartido.domain.CriterioPagina;
 import inictel.edu.pe.compartido.domain.Pagina;
 import inictel.edu.pe.compartido.domain.excepcion.AccesoDenegadoException;
+import inictel.edu.pe.compartido.domain.excepcion.DatosInvalidosException;
 import inictel.edu.pe.compartido.domain.excepcion.RecursoNoEncontradoException;
 import inictel.edu.pe.compartido.domain.excepcion.ReglaNegocioException;
 import inictel.edu.pe.compartido.domain.seguridad.ContextoUsuario;
 import inictel.edu.pe.compartido.domain.seguridad.UsuarioAutenticado;
 import inictel.edu.pe.prestamos.application.comando.RegistrarDevolucionComando;
 import inictel.edu.pe.prestamos.application.comando.RegistrarPrestamoComando;
+import inictel.edu.pe.prestamos.application.dto.DestinatarioDto;
 import inictel.edu.pe.prestamos.application.dto.PrestamoDto;
 import inictel.edu.pe.prestamos.domain.model.BienPrestado;
+import inictel.edu.pe.prestamos.domain.model.CoordinacionDestino;
+import inictel.edu.pe.prestamos.domain.model.Destinatario;
 import inictel.edu.pe.prestamos.domain.model.OperadorPrestamo;
 import inictel.edu.pe.prestamos.domain.model.PersonaResponsable;
 import inictel.edu.pe.prestamos.domain.model.Prestamo;
 import inictel.edu.pe.prestamos.domain.repository.FiltroPrestamos;
 import inictel.edu.pe.prestamos.domain.repository.PrestamoRepositorio;
 import inictel.edu.pe.prestamos.domain.service.CatalogoBienes;
+import inictel.edu.pe.prestamos.domain.service.DirectorioCoordinaciones;
 import inictel.edu.pe.prestamos.domain.service.DirectorioResponsables;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Casos de uso de prestamos y devoluciones (RF-58 .. RF-68).
@@ -40,15 +46,18 @@ public class GestionPrestamosServicio {
     private final PrestamoRepositorio prestamos;
     private final CatalogoBienes catalogo;
     private final DirectorioResponsables directorio;
+    private final DirectorioCoordinaciones coordinaciones;
     private final ContextoUsuario contexto;
 
     public GestionPrestamosServicio(PrestamoRepositorio prestamos,
                                     CatalogoBienes catalogo,
                                     DirectorioResponsables directorio,
+                                    DirectorioCoordinaciones coordinaciones,
                                     ContextoUsuario contexto) {
         this.prestamos = prestamos;
         this.catalogo = catalogo;
         this.directorio = directorio;
+        this.coordinaciones = coordinaciones;
         this.contexto = contexto;
     }
 
@@ -88,6 +97,32 @@ public class GestionPrestamosServicio {
         return prestamos.historialPorPersona(dni.trim(), ambito).stream().map(PrestamoDto::de).toList();
     }
 
+    /**
+     * RF-59: coordinaciones a las que puede ir un equipo prestado: todas las de
+     * la institucion, de su misma Direccion o de otra. La lista general de
+     * coordinaciones esta acotada a la propia (RN-23), por eso los prestamos
+     * tienen la suya, que solo lleva nombres.
+     */
+    @Transactional(readOnly = true)
+    public List<CoordinacionDestino> coordinacionesDestino() {
+        contexto.requerido();
+        return coordinaciones.todas();
+    }
+
+    /**
+     * RF-59: a quien puede entregarse un equipo en una coordinacion de destino:
+     * su Responsable y sus Operadores activos. La coordinacion de destino puede
+     * ser cualquiera de la institucion, no solo la propia.
+     */
+    @Transactional(readOnly = true)
+    public List<DestinatarioDto> destinatarios(Long coordinacionId) {
+        contexto.requerido();
+        if (coordinacionId == null) {
+            throw new DatosInvalidosException("coordinacionId", "Seleccione la coordinación de destino.");
+        }
+        return directorio.destinatariosDe(coordinacionId).stream().map(DestinatarioDto::de).toList();
+    }
+
     /** RF-67: prestamos activos vencidos. */
     @Transactional(readOnly = true)
     public List<PrestamoDto> vencidos(Long coordinacionId) {
@@ -111,10 +146,17 @@ public class GestionPrestamosServicio {
         exigirResponsableVigente(bien.coordinacionId());
         validarDisponibilidad(comando.equipoId());
 
+        String coordinacionDestino = coordinaciones.nombreDe(comando.coordinacionDestinoId())
+                .orElseThrow(() -> new DatosInvalidosException("coordinacionDestinoId",
+                        "La coordinación de destino no existe."));
+        Destinatario destinatario = exigirDestinatario(comando.personaUsuarioId(),
+                comando.coordinacionDestinoId(), coordinacionDestino);
+
         Prestamo prestamo = Prestamo.registrar(
                 bien,
-                new PersonaResponsable(comando.nombrePersona(), comando.dniPersona()),
-                comando.destino(),
+                new PersonaResponsable(destinatario.nombreCompleto(), destinatario.dni(),
+                        destinatario.id(), destinatario.coordinacionId()),
+                coordinacionDestino,
                 comando.fechaEstimadaDevolucion(),
                 comando.observacionesSalida(),
                 operadorActual());
@@ -178,6 +220,18 @@ public class GestionPrestamosServicio {
                     "Su coordinación no tiene responsable en este momento, asi que no puede "
                             + "registrar movimientos de equipos. Pida al Administrador que nombre uno.");
         }
+    }
+
+    /**
+     * RF-59: el equipo se entrega a un Responsable u Operador activo de la
+     * coordinacion de destino, y a nadie mas.
+     */
+    private Destinatario exigirDestinatario(Long usuarioId, Long coordinacionId, String coordinacion) {
+        return directorio.destinatario(usuarioId)
+                .filter(d -> Objects.equals(d.coordinacionId(), coordinacionId))
+                .orElseThrow(() -> new DatosInvalidosException("personaUsuarioId",
+                        "La persona elegida no es un responsable u operador activo de "
+                                + coordinacion + ". Elija a alguien de la lista."));
     }
 
     private FiltroPrestamos acotar(FiltroPrestamos filtro) {

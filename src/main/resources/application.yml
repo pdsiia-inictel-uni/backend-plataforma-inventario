@@ -91,8 +91,10 @@ spring:
   # antes de enviar. No es un ajuste de entorno.
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 10MB
+      # 10 MB por archivo: el PDF de una baja (un acta escaneada) pesa mas que una
+      # foto. Las fotografias siguen limitadas a 5 MB en el cliente (RF-51e).
+      max-file-size: 10MB
+      max-request-size: 12MB
 
   jackson:
     default-property-inclusion: non_null

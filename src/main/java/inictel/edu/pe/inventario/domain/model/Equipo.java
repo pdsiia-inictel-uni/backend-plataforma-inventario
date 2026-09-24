@@ -23,7 +23,7 @@ public class Equipo {
     private static final int MAX_NOMBRE = 150;
     private static final int MAX_TEXTO = 100;
     private static final int MAX_OBSERVACIONES = 1000;
-    private static final int MAX_MOTIVO = 500;
+    private static final int MAX_URL = 300;
     /** RN-25: no se registran bienes anteriores a esta fecha. */
     private static final LocalDate FECHA_MINIMA = LocalDate.of(1980, 1, 1);
 
@@ -43,7 +43,10 @@ public class Equipo {
     private String observaciones;
     private String fotoUrl;
     private boolean revisionPendiente;
+    /** Solo bajas anteriores al documento PDF; las nuevas no llevan motivo escrito. */
     private String motivoBaja;
+    /** RF-42: URL del PDF que sustenta la baja. */
+    private String documentoBajaUrl;
     private LocalDateTime fechaBaja;
     private Long responsableId;
     /**
@@ -130,6 +133,7 @@ public class Equipo {
                                       String fotoUrl,
                                       boolean revisionPendiente,
                                       String motivoBaja,
+                                      String documentoBajaUrl,
                                       LocalDateTime fechaBaja,
                                       Long responsableId,
                                       Long responsableEquipoId,
@@ -155,6 +159,7 @@ public class Equipo {
         equipo.fotoUrl = fotoUrl;
         equipo.revisionPendiente = revisionPendiente;
         equipo.motivoBaja = motivoBaja;
+        equipo.documentoBajaUrl = documentoBajaUrl;
         equipo.fechaBaja = fechaBaja;
         equipo.responsableId = responsableId;
         equipo.responsableEquipoId = responsableEquipoId;
@@ -186,7 +191,7 @@ public class Equipo {
                                 String observaciones) {
         if (!activo) {
             throw new ReglaNegocioException(
-                    "El bien esta dado de baja; para modificarlo debe reincorporarlo al inventario.");
+                    "El bien está dado de baja. La baja es definitiva y el equipo ya no admite cambios.");
         }
         this.laboratorioId = laboratorioId;
         this.nombre = exigirTexto(nombre, MAX_NOMBRE, "nombre", "Ingrese el nombre del equipo.");
@@ -233,8 +238,8 @@ public class Equipo {
         this.fechaActualizacion = LocalDateTime.now();
     }
 
-    /** RF-42, RNF-47: baja logica con motivo; el bien se conserva en el historico. */
-    public void darDeBaja(String motivo) {
+    /** RF-42, RN-17: el bien admite la baja. Se comprueba antes de guardar el PDF. */
+    public void exigirQueAdmiteBaja() {
         if (!activo) {
             throw new ReglaNegocioException("El bien ya se encuentra dado de baja.");
         }
@@ -242,12 +247,22 @@ public class Equipo {
             throw new ReglaNegocioException(
                     "No se puede dar de baja un bien prestado. Registre primero su devolución.");
         }
-        String limpio = motivo == null ? "" : motivo.trim();
+    }
+
+    /**
+     * RF-42, RNF-47: baja logica y definitiva, sustentada con un documento PDF;
+     * el bien se conserva en el historico.
+     *
+     * @param documentoUrl URL del PDF ya almacenado
+     */
+    public void darDeBaja(String documentoUrl) {
+        exigirQueAdmiteBaja();
+        String limpio = documentoUrl == null ? "" : documentoUrl.trim();
         if (limpio.isEmpty()) {
-            throw new DatosInvalidosException("motivo", "Indique el motivo de la baja.");
+            throw new DatosInvalidosException("archivo", "Adjunte el documento de baja en PDF.");
         }
-        if (limpio.length() > MAX_MOTIVO) {
-            throw new DatosInvalidosException("motivo", "El motivo no puede superar los 500 caracteres.");
+        if (limpio.length() > MAX_URL) {
+            throw new DatosInvalidosException("archivo", "La ruta del documento es demasiado larga.");
         }
         this.activo = false;
         this.condicion = CondicionEquipo.BAJA;
@@ -256,20 +271,9 @@ public class Equipo {
         // el Operador que lo tenia quedaria atado a el para siempre: no podria
         // dejar su puesto por un equipo que ya no existe (RN-38).
         this.responsableEquipoId = null;
-        this.motivoBaja = limpio;
-        this.fechaBaja = LocalDateTime.now();
-        this.fechaActualizacion = LocalDateTime.now();
-    }
-
-    /** RF-43: el bien regresa al inventario operativo. */
-    public void reincorporar() {
-        if (activo) {
-            throw new ReglaNegocioException("El bien ya se encuentra activo en el inventario.");
-        }
-        this.activo = true;
-        this.condicion = CondicionEquipo.OPERATIVO;
         this.motivoBaja = null;
-        this.fechaBaja = null;
+        this.documentoBajaUrl = limpio;
+        this.fechaBaja = LocalDateTime.now();
         this.fechaActualizacion = LocalDateTime.now();
     }
 
@@ -300,15 +304,22 @@ public class Equipo {
         this.fechaActualizacion = LocalDateTime.now();
     }
 
-    /** RF-51: fotografia del bien. */
-    public void asignarFoto(String fotoUrl) {
-        this.fotoUrl = fotoUrl;
+    /**
+     * Deshace una salida que no llego a ocurrir: el uso externo se anulo antes
+     * de usarse el equipo. Vuelve a Operativo sin tocar su revision pendiente,
+     * que es la que tenia antes de salir.
+     */
+    public void anularPrestamo() {
+        if (condicion != CondicionEquipo.PRESTADO) {
+            throw new ReglaNegocioException("El equipo no figura como prestado.");
+        }
+        this.condicion = CondicionEquipo.OPERATIVO;
         this.fechaActualizacion = LocalDateTime.now();
     }
 
-    /** RF-36: el bien queda a cargo del Responsable vigente de su Coordinacion. */
-    public void asignarResponsable(Long responsableId) {
-        this.responsableId = responsableId;
+    /** RF-51: fotografia del bien. */
+    public void asignarFoto(String fotoUrl) {
+        this.fotoUrl = fotoUrl;
         this.fechaActualizacion = LocalDateTime.now();
     }
 
@@ -521,6 +532,10 @@ public class Equipo {
 
     public String getMotivoBaja() {
         return motivoBaja;
+    }
+
+    public String getDocumentoBajaUrl() {
+        return documentoBajaUrl;
     }
 
     public LocalDateTime getFechaBaja() {

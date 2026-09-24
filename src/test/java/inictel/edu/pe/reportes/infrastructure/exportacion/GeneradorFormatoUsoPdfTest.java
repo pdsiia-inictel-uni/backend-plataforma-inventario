@@ -33,6 +33,7 @@ class GeneradorFormatoUsoPdfTest {
                                   Boolean devuelto,
                                   BigDecimal valor) {
         return new FormatoUsoDto(
+                7L,
                 "Sede Central INICTEL-UNI",
                 "Direccion de Investigacion y Desarrollo Tecnologico",
                 "Coordinacion de Investigacion",
@@ -63,8 +64,8 @@ class GeneradorFormatoUsoPdfTest {
                 devuelto,
                 null,
                 null,
-                "Ana Torres Quispe",
-                null);
+                null,
+                devuelto != null);
     }
 
     private void esUnPdf(byte[] documento) {

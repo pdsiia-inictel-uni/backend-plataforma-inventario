@@ -34,4 +34,7 @@ public interface CatalogoBienes {
      * marcado para revision del Responsable (RN-19).
      */
     void registrarRetorno(Long equipoId, boolean reportaDano, String detalle);
+
+    /** Deshace una salida que no llego a ocurrir: el bien vuelve a Operativo. */
+    void anularPrestamo(Long equipoId, String detalle);
 }

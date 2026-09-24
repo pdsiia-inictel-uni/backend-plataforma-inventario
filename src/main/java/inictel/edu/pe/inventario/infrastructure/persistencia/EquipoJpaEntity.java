@@ -91,6 +91,10 @@ public class EquipoJpaEntity {
     @Column(name = "motivo_baja", length = 500)
     private String motivoBaja;
 
+    /** RF-42: ruta del PDF que sustenta la baja. */
+    @Column(name = "documento_baja_url", length = 300)
+    private String documentoBajaUrl;
+
     @Column(name = "fecha_baja")
     private LocalDateTime fechaBaja;
 

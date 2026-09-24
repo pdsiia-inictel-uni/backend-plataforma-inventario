@@ -65,11 +65,6 @@ public record MovimientoEquipo(
                 usuarioId, usuarioNombre, rolUsuario, fechaHora);
     }
 
-    /** true si el hecho implico un cambio de condicion del bien. */
-    public boolean cambioCondicion() {
-        return condicionAnterior != null && condicionNueva != null && condicionAnterior != condicionNueva;
-    }
-
     private static String recortar(String detalle) {
         if (detalle == null) {
             return null;

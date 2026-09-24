@@ -35,37 +35,25 @@ import java.util.List;
 public class SeguridadConfig {
 
     /**
-     * Content-Security-Policy estricta (RNF-04).
+     * Content-Security-Policy de la API (RNF-07).
      *
-     * <p>Sin {@code unsafe-inline} ni {@code unsafe-eval}: el frontend Angular
-     * no usa manejadores en linea, scripts embebidos ni estilos en atributos.
-     * {@code blob:} en img-src es necesario porque las fotografias de los
-     * bienes se descargan con el token JWT y se muestran como blob.</p>
+     * <p>Este servidor no entrega ninguna pagina: responde JSON, y las
+     * fotografias y los PDF de baja que el frontend descarga con el token JWT
+     * y muestra como blob desde su propio origen (la CSP que rige esos blobs es
+     * la del frontend, no esta). Por eso la politica es la de una API: nada
+     * puede cargarse, incrustarse ni enviarse desde una respuesta suya. Si
+     * alguien abriera una respuesta en el navegador, no ejecutaria nada.</p>
+     *
+     * <p>La politica de la aplicacion —la que permite el bundle, los estilos,
+     * las fotos en blob y los PDF en marco— la emite quien sirve el HTML: el
+     * nginx del frontend (seguridad-cabeceras.conf) y, en desarrollo, la
+     * etiqueta meta de index.html.</p>
      */
-    private static final String CSP_ESTRICTA = String.join("; ",
-            "default-src 'self'",
-            "script-src 'self'",
-            "script-src-attr 'none'",
-            "style-src 'self'",
-            "style-src-attr 'none'",
-            "img-src 'self' data: blob:",
-            "font-src 'self'",
-            "connect-src 'self'",
-            "media-src 'self'",
-            "worker-src 'self' blob:",
-            // RF-78: la vista previa del formato de registro de uso muestra en un
-            // marco el PDF que el servidor acaba de devolver, y un blob del propio
-            // origen no es 'self'. Es la unica directiva que la v3.9 toca, y no
-            // relaja ninguna de las que importan: ni script-src ni style-src
-            // admiten nada nuevo, y sigue sin haber 'unsafe-inline' ni
-            // 'unsafe-eval' en ninguna parte (RNF-07).
-            "frame-src 'self' blob:",
-            "manifest-src 'self'",
-            "object-src 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
+    private static final String CSP_API = String.join("; ",
+            "default-src 'none'",
             "frame-ancestors 'none'",
-            "upgrade-insecure-requests");
+            "base-uri 'none'",
+            "form-action 'none'");
 
     /** Rutas de la documentacion OpenAPI (RNF-17). */
     private static final String[] RUTAS_DOCUMENTACION = {
@@ -148,7 +136,7 @@ public class SeguridadConfig {
                         .accessDeniedHandler(manejadorAccesoDenegado))
                 .headers(headers -> headers
                         // RNF-04: cabeceras de endurecimiento del navegador.
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP_ESTRICTA))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP_API))
                         .frameOptions(frame -> frame.deny())
                         .referrerPolicy(referrer -> referrer
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))

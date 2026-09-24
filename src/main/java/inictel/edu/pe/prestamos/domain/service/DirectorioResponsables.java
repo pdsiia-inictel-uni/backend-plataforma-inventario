@@ -1,5 +1,10 @@
 package inictel.edu.pe.prestamos.domain.service;
 
+import inictel.edu.pe.prestamos.domain.model.Destinatario;
+
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Puerto hacia {@code iam}: lo unico que los prestamos necesitan saber de las
  * personas (RNF-39).
@@ -13,4 +18,13 @@ public interface DirectorioResponsables {
 
     /** true si la Coordinacion tiene Responsable vigente. */
     boolean tieneResponsableVigente(Long coordinacionId);
+
+    /**
+     * RF-59: quienes pueden llevarse un equipo a esa coordinacion: su
+     * Responsable y sus Operadores activos.
+     */
+    List<Destinatario> destinatariosDe(Long coordinacionId);
+
+    /** RF-59: la persona, si es un Responsable u Operador activo. */
+    Optional<Destinatario> destinatario(Long usuarioId);
 }

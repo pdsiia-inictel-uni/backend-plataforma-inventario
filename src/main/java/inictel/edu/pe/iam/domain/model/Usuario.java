@@ -57,6 +57,14 @@ public class Usuario {
     private Rol rol;
     private final Set<Long> coordinaciones = new LinkedHashSet<>();
     private EstadoCuenta estado;
+    /**
+     * Puesto que tenia al darse de baja (RN-34). La baja borra el rol y la
+     * asignacion; esto lo recuerda para que la persona siga apareciendo, como
+     * dada de baja, en la lista de su Coordinacion y en los filtros por rol.
+     * Se limpia al reincorporarla.
+     */
+    private Rol ultimoRol;
+    private Long ultimaCoordinacion;
     private boolean debeCambiarPassword;
     private int intentosFallidos;
     private LocalDateTime bloqueadoHasta;
@@ -140,6 +148,8 @@ public class Usuario {
                                        Rol rol,
                                        Collection<Long> coordinaciones,
                                        EstadoCuenta estado,
+                                       Rol ultimoRol,
+                                       Long ultimaCoordinacion,
                                        boolean debeCambiarPassword,
                                        int intentosFallidos,
                                        LocalDateTime bloqueadoHasta,
@@ -159,6 +169,8 @@ public class Usuario {
             usuario.coordinaciones.addAll(coordinaciones);
         }
         usuario.estado = estado == null ? EstadoCuenta.ACTIVA : estado;
+        usuario.ultimoRol = ultimoRol;
+        usuario.ultimaCoordinacion = ultimaCoordinacion;
         usuario.debeCambiarPassword = debeCambiarPassword;
         usuario.intentosFallidos = intentosFallidos;
         usuario.bloqueadoHasta = bloqueadoHasta;
@@ -366,6 +378,8 @@ public class Usuario {
                     "'" + nombreCompleto() + "' ya esta dado de baja de la institución.");
         }
         this.estado = EstadoCuenta.BAJA;
+        this.ultimoRol = rol;
+        this.ultimaCoordinacion = getCoordinacion();
         liberarPuesto();
         this.fechaActualizacion = LocalDateTime.now();
     }
@@ -383,6 +397,8 @@ public class Usuario {
                     "'" + nombreCompleto() + "' no esta dado de baja: no hay nada que reincorporar.");
         }
         this.estado = EstadoCuenta.ACTIVA;
+        this.ultimoRol = null;
+        this.ultimaCoordinacion = null;
         this.intentosFallidos = 0;
         this.bloqueadoHasta = null;
         this.fechaActualizacion = LocalDateTime.now();
@@ -627,6 +643,25 @@ public class Usuario {
 
     public EstadoCuenta getEstado() {
         return estado;
+    }
+
+    /** Rol que tenia al darse de baja; null si la cuenta esta activa (RN-34). */
+    public Rol getUltimoRol() {
+        return ultimoRol;
+    }
+
+    /** Coordinacion en la que trabajaba al darse de baja; null si no tenia o esta activa. */
+    public Long getUltimaCoordinacion() {
+        return ultimaCoordinacion;
+    }
+
+    /**
+     * La persona trabajaba en esa Coordinacion cuando se dio de baja. Es lo que
+     * permite a su Responsable seguir viendola —como dada de baja— y
+     * reincorporarla.
+     */
+    public boolean dejoLaCoordinacion(Long coordinacion) {
+        return estaDeBaja() && coordinacion != null && coordinacion.equals(ultimaCoordinacion);
     }
 
     /** RF-07, RN-10: la cuenta activa es la unica que autentica. */

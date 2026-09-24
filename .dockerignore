@@ -4,8 +4,16 @@
 .env.*
 !.env.example
 target/
+uploads/
+certificados/
 *.log
 .idea/
 .vscode/
 .git/
-uploads/
+.gitattributes
+.gitignore
+*.md
+LICENSE
+Dockerfile
+.dockerignore
+docker-compose*.yml

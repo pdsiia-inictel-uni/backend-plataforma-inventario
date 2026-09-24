@@ -38,3 +38,7 @@ build/
 .env.prod
 .env.*.local
 !.env.example
+
+### Certificados TLS ###
+# El certificado y su clave se montan en el contenedor; nunca se versionan.
+certificados/

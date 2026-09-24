@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Sistema de Gestion de Inventarios - INICTEL-UNI
--- V1: Esquema inicial (ERS v3.5, seccion 5)
+-- V1: Esquema completo (ERS v1, seccion 5)
 --
 -- La institucion "INICTEL-UNI" es una constante de la aplicacion (RN-01);
 -- no se persiste. La jerarquia comienza en DIRECCION.
@@ -23,6 +23,12 @@
 --   La v3.5 las funde en esta: el esquema se declara una vez, tal como es hoy.
 --   Lo que aquellas migraciones decian sigue dicho en la ERS, que es donde se
 --   explica por que el sistema es como es (seccion 5 y capitulo 0).
+--
+--   La v1 hace lo mismo con las cuatro que vinieron despues (la retirada de la
+--   suspension de cuentas, los prestamos a personas registradas con la baja
+--   definitiva de bienes, el codigo patrimonial alfanumerico y el PDF de la
+--   baja): la base del servidor estaba vacia y ninguna tenia datos que migrar.
+--   El sistema se instala desde cero con V1 (esquema) y V2 (datos base).
 -- ----------------------------------------------------------------------------
 -- ============================================================================
 
@@ -125,9 +131,19 @@ CREATE TABLE usuario (
     ultimo_acceso           TIMESTAMP,
     fecha_creacion          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion     TIMESTAMP,
+    -- RF-23b: el puesto que tenia la persona al darse de baja. La baja libera
+    -- el puesto (RN-34) —borra la asignacion y deja el rol en NULL— y sin este
+    -- rastro la persona desaparecia de la lista de su Responsable y de los
+    -- filtros por rol y por coordinacion. Se limpian al reincorporarla.
+    ultimo_rol              VARCHAR(20),
+    ultima_coordinacion_id  BIGINT        REFERENCES coordinacion (id),
     CONSTRAINT ck_usuario_rol CHECK (rol IN ('ADMIN', 'RESPONSABLE', 'OPERADOR')),
-    CONSTRAINT ck_usuario_estado CHECK (estado IN ('ACTIVA', 'SUSPENDIDA', 'BAJA')),
-    CONSTRAINT ck_usuario_dni CHECK (dni ~ '^[0-9]{8}$')
+    -- RF-22b: la persona sigue en la institucion o ya no. No hay suspension
+    -- temporal (RF-22c).
+    CONSTRAINT ck_usuario_estado CHECK (estado IN ('ACTIVA', 'BAJA')),
+    CONSTRAINT ck_usuario_dni CHECK (dni ~ '^[0-9]{8}$'),
+    CONSTRAINT ck_usuario_ultimo_rol
+        CHECK (ultimo_rol IS NULL OR ultimo_rol IN ('ADMIN', 'RESPONSABLE', 'OPERADOR'))
 );
 
 CREATE UNIQUE INDEX uk_usuario_username ON usuario (LOWER(username));
@@ -135,9 +151,11 @@ CREATE UNIQUE INDEX uk_usuario_correo   ON usuario (LOWER(correo));
 CREATE UNIQUE INDEX uk_usuario_dni      ON usuario (dni);
 
 CREATE INDEX ix_usuario_rol_estado ON usuario (rol, estado);
+CREATE INDEX ix_usuario_ultima_coordinacion ON usuario (ultima_coordinacion_id)
+    WHERE ultima_coordinacion_id IS NOT NULL;
 
 COMMENT ON COLUMN usuario.estado IS
-    'ACTIVA = trabaja y entra. SUSPENDIDA = no entra por ahora (vacaciones, permiso) y conserva su puesto. BAJA = ya no pertenece a la institucion y no conserva puesto (RF-22b, RN-34). Los usuarios nunca se eliminan (RN-09).';
+    'ACTIVA = trabaja y entra. BAJA = ya no pertenece a la institucion y no conserva puesto (RF-22b, RN-34). Los usuarios nunca se eliminan (RN-09).';
 COMMENT ON COLUMN usuario.rol IS
     'ADMIN | RESPONSABLE | OPERADOR. NULL = registro previo: la persona existe pero aun no tiene puesto ni puede entrar (RF-16b).';
 COMMENT ON COLUMN usuario.segundo_apellido IS
@@ -232,11 +250,16 @@ CREATE TABLE equipo (
     fecha_registro         TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion    TIMESTAMP,
     activo                 BOOLEAN        NOT NULL DEFAULT TRUE,
+    -- RF-42: ruta del PDF que sustenta la baja (carpeta archivos/).
+    documento_baja_url     VARCHAR(300),
     CONSTRAINT ck_equipo_condicion CHECK (condicion IN ('OPERATIVO', 'PRESTADO', 'MANTENIMIENTO', 'BAJA')),
     -- El limite superior —que la fecha no sea futura— no cabe en un CHECK:
     -- exigiria CURRENT_DATE, que no es inmutable. Vive en el dominio (RN-25).
     CONSTRAINT ck_equipo_fecha_adq CHECK (fecha_adquisicion >= DATE '1980-01-01'),
     CONSTRAINT ck_equipo_costo     CHECK (costo >= 0),
+    -- RF-34: exactamente 12 letras y/o numeros; la aplicacion lo guarda en
+    -- mayusculas.
+    CONSTRAINT ck_equipo_codigo_patrimonial CHECK (codigo_patrimonial ~ '^[A-Z0-9]{12}$'),
     -- RN-12: el laboratorio, si existe, pertenece a la misma Coordinacion que el bien
     CONSTRAINT fk_equipo_laboratorio FOREIGN KEY (laboratorio_id, coordinacion_id)
         REFERENCES laboratorio (id, coordinacion_id),
@@ -291,6 +314,8 @@ COMMENT ON COLUMN equipo.responsable_equipo_id IS
     'Operador que tiene el bien a su cargo (RF-83). NULL = lo lleva el Responsable de la Coordinacion, sea quien sea en cada momento (RN-37).';
 COMMENT ON COLUMN equipo.revision_pendiente IS 'Devuelto con dano; el Responsable debe confirmar mantenimiento (RN-19).';
 COMMENT ON COLUMN equipo.activo IS 'FALSE = dado de baja. Baja logica, nunca fisica (RNF-47).';
+COMMENT ON COLUMN equipo.documento_baja_url IS
+    'Ruta del PDF que sustenta la baja (carpeta archivos/, RF-42). motivo_baja queda para una baja sin documento.';
 
 -- ---------------------------------------------------------------------------
 -- MOVIMIENTO_EQUIPO - historial inmutable del bien (RF-53 .. RF-57)
@@ -335,6 +360,12 @@ CREATE TABLE prestamo (
     usuario_presta_id          BIGINT        NOT NULL REFERENCES usuario (id),
     usuario_recibe_id          BIGINT        REFERENCES usuario (id),
     estado                     VARCHAR(20)   NOT NULL DEFAULT 'ACTIVO',
+    -- RF-59: el equipo sale a nombre de un Responsable u Operador registrado,
+    -- de la coordinacion de destino que se elige primero. nombre_persona y
+    -- dni_persona son la fotografia del momento de la salida: el historial no
+    -- cambia si la persona corrige despues sus datos.
+    persona_usuario_id         BIGINT        REFERENCES usuario (id),
+    coordinacion_destino_id    BIGINT        REFERENCES coordinacion (id),
     CONSTRAINT ck_prestamo_estado CHECK (estado IN ('ACTIVO', 'DEVUELTO')),
     CONSTRAINT ck_prestamo_dni    CHECK (dni_persona ~ '^[0-9]{8}$'),
     -- El prestamo hereda la Coordinacion del bien; la base lo garantiza (RN-23)
@@ -352,6 +383,85 @@ CREATE INDEX ix_prestamo_equipo       ON prestamo (equipo_id, fecha_prestamo DES
 CREATE INDEX ix_prestamo_dni          ON prestamo (dni_persona);
 CREATE INDEX ix_prestamo_vencidos     ON prestamo (fecha_estimada_devolucion)
     WHERE estado = 'ACTIVO';
+CREATE INDEX ix_prestamo_persona_usuario ON prestamo (persona_usuario_id);
+CREATE INDEX ix_prestamo_coord_destino   ON prestamo (coordinacion_destino_id);
+
+COMMENT ON COLUMN prestamo.persona_usuario_id IS
+    'Usuario registrado (Responsable u Operador) que se lleva el bien.';
+COMMENT ON COLUMN prestamo.coordinacion_destino_id IS
+    'Coordinacion de destino del bien: la de la persona que lo lleva.';
+
+-- ---------------------------------------------------------------------------
+-- USO EXTERNO (RF-78): prestamo de un equipo para que lo use, dentro de la
+-- institucion, personal de otra institucion (UPC, UTEC...) con su encargado.
+-- El punto 1 conserva el formato en papel: el responsable del equipamiento es
+-- el Coordinador, y se anotan el investigador encargado, su correo y celular.
+--
+-- Es el "Formato de registro de uso de equipos de investigacion", guardado.
+-- Se registra en dos partes:
+--   * apertura (puntos 1 a 5): encargado, equipo, usuario, proyecto y uso.
+--     El inicio lo pone el servidor y el equipo pasa a PRESTADO.
+--   * cierre (puntos 6 a 10): conformidad de entrega y de devolucion,
+--     incidentes y observaciones. El equipo vuelve a OPERATIVO, con revision
+--     pendiente si volvio en malas condiciones.
+-- El punto 9 son las firmas: se ponen a mano sobre el PDF impreso.
+-- ---------------------------------------------------------------------------
+CREATE TABLE uso_externo (
+    id                     BIGSERIAL     PRIMARY KEY,
+    equipo_id              BIGINT        NOT NULL,
+    coordinacion_id        BIGINT        NOT NULL REFERENCES coordinacion (id),
+
+    -- 1. Responsable del equipamiento (Coordinador): investigador encargado
+    encargado_nombre       VARCHAR(150)  NOT NULL,
+    encargado_correo       VARCHAR(150),
+    encargado_celular      VARCHAR(30),
+
+    -- 2. Condicion del equipo al abrirse el uso (el resto sale del bien)
+    estado_equipo_inicio   VARCHAR(40)   NOT NULL,
+
+    -- 3. Datos del usuario
+    usuario_nombre         VARCHAR(150)  NOT NULL,
+    usuario_correo         VARCHAR(150),
+    usuario_telefono       VARCHAR(30),
+
+    -- 4. Proyecto asociado y actividad
+    proyecto               VARCHAR(1000),
+
+    -- 5. Registro de uso
+    fecha_inicio           TIMESTAMP     NOT NULL,
+    fecha_fin_prevista     DATE,
+    hora_fin_prevista      TIME,
+    actividad              VARCHAR(1000),
+    usuario_registra_id    BIGINT        NOT NULL REFERENCES usuario (id),
+
+    -- 6 a 10. Cierre
+    entregado_operativo    BOOLEAN,
+    devuelto_operativo     BOOLEAN,
+    incidente              VARCHAR(1000),
+    accion_correctiva      VARCHAR(1000),
+    observaciones          VARCHAR(1000),
+    fecha_cierre           TIMESTAMP,
+    usuario_cierra_id      BIGINT        REFERENCES usuario (id),
+
+    estado                 VARCHAR(20)   NOT NULL DEFAULT 'ABIERTO',
+    CONSTRAINT ck_uso_externo_estado CHECK (estado IN ('ABIERTO', 'CERRADO')),
+    -- Un uso cerrado tiene su cierre completo; uno abierto, ninguno.
+    CONSTRAINT ck_uso_externo_cierre CHECK (
+        (estado = 'ABIERTO' AND fecha_cierre IS NULL AND usuario_cierra_id IS NULL)
+        OR (estado = 'CERRADO' AND fecha_cierre IS NOT NULL AND usuario_cierra_id IS NOT NULL
+            AND entregado_operativo IS NOT NULL AND devuelto_operativo IS NOT NULL)),
+    -- El uso hereda la Coordinacion del bien; la base lo garantiza (RN-23)
+    CONSTRAINT fk_uso_externo_equipo FOREIGN KEY (equipo_id, coordinacion_id)
+        REFERENCES equipo (id, coordinacion_id)
+);
+
+-- Un equipo no puede estar en dos usos externos abiertos a la vez.
+CREATE UNIQUE INDEX uk_uso_externo_abierto_por_equipo
+    ON uso_externo (equipo_id)
+    WHERE estado = 'ABIERTO';
+
+CREATE INDEX ix_uso_externo_equipo      ON uso_externo (equipo_id, fecha_inicio DESC);
+CREATE INDEX ix_uso_externo_coord_estado ON uso_externo (coordinacion_id, estado);
 
 -- ---------------------------------------------------------------------------
 -- INMUTABILIDAD DEL HISTORIAL (RN-21, RF-55)
@@ -375,3 +485,23 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER tg_movimiento_equipo_inmutable
     BEFORE UPDATE OR DELETE ON movimiento_equipo
     FOR EACH ROW EXECUTE FUNCTION fn_registro_inmutable();
+
+-- ---------------------------------------------------------------------------
+-- BAJA DEFINITIVA (RF-43)
+--
+-- Un bien dado de baja no vuelve al inventario. La aplicacion no ofrece la
+-- reincorporacion; la base lo sostiene por su cuenta, igual que sostiene la
+-- inmutabilidad del historial (defensa en profundidad).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_equipo_baja_definitiva() RETURNS trigger AS $$
+BEGIN
+    IF OLD.activo = FALSE AND (NEW.activo = TRUE OR NEW.condicion <> 'BAJA') THEN
+        RAISE EXCEPTION 'Un bien dado de baja no puede reincorporarse (equipo %).', OLD.id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_equipo_baja_definitiva
+    BEFORE UPDATE ON equipo
+    FOR EACH ROW EXECUTE FUNCTION fn_equipo_baja_definitiva();

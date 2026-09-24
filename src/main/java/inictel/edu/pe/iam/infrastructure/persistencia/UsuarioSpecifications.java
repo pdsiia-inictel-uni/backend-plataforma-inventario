@@ -2,6 +2,7 @@ package inictel.edu.pe.iam.infrastructure.persistencia;
 
 import inictel.edu.pe.compartido.domain.seguridad.Rol;
 import inictel.edu.pe.iam.domain.model.EstadoCuenta;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
@@ -30,7 +31,11 @@ final class UsuarioSpecifications {
         if (rol == null) {
             return null;
         }
-        return (root, query, cb) -> cb.equal(root.get("rol"), rol);
+        // RN-34: quien esta de baja ya no tiene rol, pero se le sigue
+        // encontrando por el que tenia al irse.
+        return (root, query, cb) -> cb.or(
+                cb.equal(root.get("rol"), rol),
+                cb.and(cb.isNull(root.get("rol")), cb.equal(root.get("ultimoRol"), rol)));
     }
 
     /**
@@ -48,7 +53,11 @@ final class UsuarioSpecifications {
             if (query != null) {
                 query.distinct(true);
             }
-            return cb.equal(root.join("asignaciones").get("coordinacionId"), coordinacionId);
+            // RN-34: la baja borra la asignacion; quien trabajaba aqui sigue
+            // figurando en la lista de su coordinacion, como dado de baja.
+            return cb.or(
+                    cb.equal(root.join("asignaciones", JoinType.LEFT).get("coordinacionId"), coordinacionId),
+                    cb.equal(root.get("ultimaCoordinacionId"), coordinacionId));
         };
     }
 
@@ -57,8 +66,10 @@ final class UsuarioSpecifications {
         if (sinAsignar == null) {
             return null;
         }
+        // Quien esta de baja no tiene rol, pero tampoco es trabajo pendiente
+        // de asignar: primero habria que reincorporarlo.
         return (root, query, cb) -> sinAsignar
-                ? cb.isNull(root.get("rol"))
+                ? cb.and(cb.isNull(root.get("rol")), cb.equal(root.get("estado"), EstadoCuenta.ACTIVA))
                 : cb.isNotNull(root.get("rol"));
     }
 

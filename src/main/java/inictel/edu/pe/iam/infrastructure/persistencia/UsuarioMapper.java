@@ -34,6 +34,8 @@ final class UsuarioMapper {
                 entidad.getRol(),
                 entidad.getAsignaciones().stream().map(AsignacionEmbebida::getCoordinacionId).toList(),
                 entidad.getEstado(),
+                entidad.getUltimoRol(),
+                entidad.getUltimaCoordinacionId(),
                 entidad.isDebeCambiarPassword(),
                 entidad.getIntentosFallidos(),
                 entidad.getBloqueadoHasta(),
@@ -57,6 +59,8 @@ final class UsuarioMapper {
         entidad.setRol(usuario.getRol());
         volcarAsignaciones(usuario, entidad);
         entidad.setEstado(usuario.getEstado());
+        entidad.setUltimoRol(usuario.getUltimoRol());
+        entidad.setUltimaCoordinacionId(usuario.getUltimaCoordinacion());
         entidad.setDebeCambiarPassword(usuario.isDebeCambiarPassword());
         entidad.setIntentosFallidos(usuario.getIntentosFallidos());
         entidad.setBloqueadoHasta(usuario.getBloqueadoHasta());

@@ -31,6 +31,9 @@ public record UsuarioDto(
         List<CoordinacionAsignada> coordinaciones,
         EstadoCuenta estado,
         String estadoEtiqueta,
+        /** RN-34: puesto que tenia al darse de baja; null si la cuenta esta activa. */
+        Rol ultimoRol,
+        CoordinacionAsignada ultimaCoordinacion,
         boolean debeCambiarPassword,
         /** RF-06b: solo la cuenta administradora inicial declara su identidad al estrenarse. */
         boolean debeCompletarIdentidad,
@@ -54,6 +57,12 @@ public record UsuarioDto(
     public static final String SIN_ASIGNAR = "Sin asignar";
 
     public static UsuarioDto de(Usuario u, List<CoordinacionAsignada> coordinaciones) {
+        return de(u, coordinaciones, null);
+    }
+
+    public static UsuarioDto de(Usuario u,
+                                List<CoordinacionAsignada> coordinaciones,
+                                CoordinacionAsignada ultimaCoordinacion) {
         return new UsuarioDto(
                 u.getId(),
                 u.getUsername().valor(),
@@ -65,15 +74,34 @@ public record UsuarioDto(
                 u.getCargo(),
                 u.getCorreo().valor(),
                 u.getRol(),
-                u.getRol() == null ? SIN_ASIGNAR : u.getRol().getEtiqueta(),
-                u.estaSinAsignar(),
+                etiquetaDeRol(u),
+                // Quien esta de baja no es trabajo pendiente de asignar: primero
+                // habria que reincorporarlo (RN-34).
+                u.estaSinAsignar() && u.estaActiva(),
                 coordinaciones == null ? List.of() : List.copyOf(coordinaciones),
                 u.getEstado(),
                 u.getEstado().getEtiqueta(),
+                u.getUltimoRol(),
+                ultimaCoordinacion,
                 u.isDebeCambiarPassword(),
                 u.debeCompletarIdentidad(),
                 u.estaBloqueado(),
                 u.getUltimoAcceso(),
                 u.getFechaCreacion());
+    }
+
+    /**
+     * El rol que se lee en la lista. Quien esta de baja ya no tiene ninguno,
+     * pero se le sigue nombrando por el que tenia: "Operador" y la insignia
+     * "De baja" dicen juntos lo que paso.
+     */
+    private static String etiquetaDeRol(Usuario u) {
+        if (u.getRol() != null) {
+            return u.getRol().getEtiqueta();
+        }
+        if (u.getUltimoRol() != null) {
+            return u.getUltimoRol().getEtiqueta();
+        }
+        return SIN_ASIGNAR;
     }
 }

@@ -55,8 +55,6 @@ public interface UsuarioRepositorio {
 
     long contarActivos();
 
-    long contarActivosEn(Long coordinacionId);
-
     /** true cuando no existe ningun usuario: dispara la creacion de la cuenta inicial. */
     boolean estaVacio();
 }

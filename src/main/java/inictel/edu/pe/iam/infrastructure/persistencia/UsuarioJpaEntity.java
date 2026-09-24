@@ -76,6 +76,15 @@ public class UsuarioJpaEntity {
     @Column(name = "estado", nullable = false, length = 20)
     private EstadoCuenta estado = EstadoCuenta.ACTIVA;
 
+    /** RN-34: rol que tenia al darse de baja; se limpia al reincorporarse. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ultimo_rol", length = 20)
+    private Rol ultimoRol;
+
+    /** RN-34: coordinacion en la que trabajaba al darse de baja. */
+    @Column(name = "ultima_coordinacion_id")
+    private Long ultimaCoordinacionId;
+
     @Column(name = "debe_cambiar_password", nullable = false)
     private boolean debeCambiarPassword = false;
 

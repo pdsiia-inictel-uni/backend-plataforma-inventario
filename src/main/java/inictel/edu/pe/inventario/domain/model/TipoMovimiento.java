@@ -15,6 +15,7 @@ public enum TipoMovimiento {
     MANTENIMIENTO("Enviado a mantenimiento"),
     OPERATIVO("Devuelto a condición operativa"),
     BAJA("Dado de baja"),
+    /** Historico: la reincorporacion de bienes dados de baja ya no existe; se conserva para leer movimientos antiguos. */
     REINCORPORACION("Reincorporado al inventario"),
     EDICION("Datos modificados"),
     REUBICACION("Reubicado de laboratorio"),

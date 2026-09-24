@@ -25,6 +25,7 @@ import inictel.edu.pe.inventario.domain.repository.CategoriaRepositorio;
 import inictel.edu.pe.inventario.domain.repository.EquipoRepositorio;
 import inictel.edu.pe.inventario.domain.repository.FiltroEquipos;
 import inictel.edu.pe.inventario.domain.repository.MovimientoRepositorio;
+import inictel.edu.pe.inventario.domain.service.AlmacenDocumentosBaja;
 import inictel.edu.pe.inventario.domain.service.AlmacenFotos;
 import inictel.edu.pe.inventario.domain.service.DirectorioUsuarios;
 import inictel.edu.pe.inventario.domain.service.UbicacionesDisponibles;
@@ -60,6 +61,7 @@ public class GestionInventarioServicio {
     private final DirectorioUsuarios directorio;
     private final UbicacionesDisponibles ubicaciones;
     private final AlmacenFotos almacenFotos;
+    private final AlmacenDocumentosBaja almacenDocumentosBaja;
     private final ContextoUsuario contexto;
 
     public GestionInventarioServicio(EquipoRepositorio equipos,
@@ -68,6 +70,7 @@ public class GestionInventarioServicio {
                                      DirectorioUsuarios directorio,
                                      UbicacionesDisponibles ubicaciones,
                                      AlmacenFotos almacenFotos,
+                                     AlmacenDocumentosBaja almacenDocumentosBaja,
                                      ContextoUsuario contexto) {
         this.equipos = equipos;
         this.movimientos = movimientos;
@@ -75,6 +78,7 @@ public class GestionInventarioServicio {
         this.directorio = directorio;
         this.ubicaciones = ubicaciones;
         this.almacenFotos = almacenFotos;
+        this.almacenDocumentosBaja = almacenDocumentosBaja;
         this.contexto = contexto;
     }
 
@@ -347,7 +351,7 @@ public class GestionInventarioServicio {
     }
 
     // ------------------------------------------------------------------
-    // RF-41 .. RF-43: condicion, baja y reincorporacion
+    // RF-41, RF-42: condicion y baja (la baja es definitiva)
     // ------------------------------------------------------------------
 
     /** RF-41: el Responsable retira el bien del servicio. */
@@ -390,39 +394,33 @@ public class GestionInventarioServicio {
         return componer(guardado);
     }
 
-    /** RF-42: baja logica con motivo. */
+    /**
+     * RF-42: baja logica y definitiva, sustentada con un PDF.
+     *
+     * <p>Primero se comprueba que el bien admite la baja y despues se guarda el
+     * documento: asi un rechazo no deja archivos sueltos. Si falla lo que
+     * sigue, el PDF recien guardado se borra.</p>
+     */
     @Transactional
-    public EquipoDto darDeBaja(Long id, String motivo) {
+    public EquipoDto darDeBaja(Long id, String nombreOriginal, String tipoContenido,
+                               long tamano, InputStream contenido) {
         Equipo equipo = exigirEquipo(id);
         exigirResponsableDe(equipo);
+        equipo.exigirQueAdmiteBaja();
 
-        CondicionEquipo anterior = equipo.getCondicion();
-        equipo.darDeBaja(motivo);
-        Equipo guardado = equipos.guardar(equipo);
+        String url = almacenDocumentosBaja.guardar(nombreOriginal, tipoContenido, tamano, contenido);
+        try {
+            CondicionEquipo anterior = equipo.getCondicion();
+            equipo.darDeBaja(url);
+            Equipo guardado = equipos.guardar(equipo);
 
-        registrarMovimiento(guardado, TipoMovimiento.BAJA, anterior,
-                "Baja del inventario. Motivo: " + guardado.getMotivoBaja());
-
-        return componer(guardado);
-    }
-
-    /** RF-43: reincorporacion al inventario operativo. */
-    @Transactional
-    public EquipoDto reincorporar(Long id, String motivo) {
-        Equipo equipo = exigirEquipo(id);
-        exigirResponsableDe(equipo);
-        exigirLaboratorioEnFuncionamiento(equipo);
-
-        CondicionEquipo anterior = equipo.getCondicion();
-        equipo.reincorporar();
-        Equipo guardado = equipos.guardar(equipo);
-
-        String detalle = motivo == null || motivo.isBlank()
-                ? "Reincorporado al inventario."
-                : "Reincorporado al inventario. Motivo: " + motivo.trim();
-        registrarMovimiento(guardado, TipoMovimiento.REINCORPORACION, anterior, detalle);
-
-        return componer(guardado);
+            registrarMovimiento(guardado, TipoMovimiento.BAJA, anterior,
+                    "Baja del inventario, sustentada con documento PDF.");
+            return componer(guardado);
+        } catch (RuntimeException ex) {
+            almacenDocumentosBaja.eliminar(url);
+            throw ex;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -505,11 +503,6 @@ public class GestionInventarioServicio {
                             + "responsable y a los operadores de cada coordinación.");
         }
         return actual;
-    }
-
-    private void exigirOperativoDe(Equipo equipo) {
-        UsuarioAutenticado actual = exigirOperativo();
-        actual.exigirAccesoA(equipo.getCoordinacionId());
     }
 
     /**
@@ -637,26 +630,6 @@ public class GestionInventarioServicio {
             throw new DatosInvalidosException("categoriaId", "La categoría seleccionada esta desactivada.");
         }
         return categoria.referencia();
-    }
-
-    /**
-     * RF-14: un bien no vuelve al servicio dentro de un laboratorio desactivado.
-     *
-     * <p>Un laboratorio puede desactivarse con bienes dados de baja dentro. Si
-     * uno de ellos se reincorporara ahi, quedaria un bien en servicio en un
-     * lugar que ya no existe, que es justo lo que la desactivacion impide. Como
-     * un bien de baja no se edita, la salida es que el Administrador reactive
-     * el laboratorio antes.</p>
-     */
-    private void exigirLaboratorioEnFuncionamiento(Equipo equipo) {
-        Long laboratorioId = equipo.getLaboratorioId();
-        if (laboratorioId != null
-                && !ubicaciones.laboratorioPerteneceA(laboratorioId, equipo.getCoordinacionId())) {
-            throw new ReglaNegocioException(
-                    "El equipo está ubicado en el laboratorio \""
-                            + nombreLaboratorioODefecto(laboratorioId) + "\", que está desactivado. "
-                            + "Pida al Administrador que lo active antes de reincorporar el equipo.");
-        }
     }
 
     /** RN-12: el laboratorio, si se indica, es de la misma Coordinacion. */

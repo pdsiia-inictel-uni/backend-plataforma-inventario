@@ -42,9 +42,4 @@ public enum Rol {
     public String authority() {
         return "ROLE_" + name();
     }
-
-    /** RN-05: solo el Administrador queda fuera de la estructura. */
-    public boolean requiereCoordinacion() {
-        return this != ADMIN;
-    }
 }

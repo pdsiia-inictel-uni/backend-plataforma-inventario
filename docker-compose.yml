@@ -1,0 +1,104 @@
+# =============================================================================
+# Sistema de Gestion de Inventarios INICTEL-UNI - despliegue con Docker Compose
+#
+# Tres servicios (RNF-44): la base de datos, el backend y el frontend (nginx).
+# Solo el frontend publica puertos; la base y la API se alcanzan unicamente por
+# la red interna, y nginx reenvia /api al backend (RNF-44b).
+#
+# Requisitos:
+#   - Los repositorios backend/ y frontend/ uno al lado del otro: el frontend
+#     se construye desde ../frontend.
+#   - backend/.env.prod completo (copia de .env.example con los valores reales).
+#   - backend/certificados/inventario.crt y inventario.key (el certificado TLS).
+#
+# Uso, desde backend/:
+#   docker compose --env-file .env.prod up -d --build
+#
+# --env-file es imprescindible: de ese archivo salen tambien el usuario y la
+# contrasena con los que se crea la base, y sin el Compose leeria .env, que es
+# el de desarrollo.
+# =============================================================================
+
+name: inventario-inictel
+
+x-registro: &registro
+  # Los registros de cada contenedor se rotan: no llenan el disco del servidor.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+
+  # --------------------------------------------------------------- Base de datos
+  base-datos:
+    image: postgres:17-alpine
+    <<: *registro
+    restart: unless-stopped
+    environment:
+      # El usuario y la contrasena son los mismos que usa el backend: salen de
+      # las mismas variables y no pueden desincronizarse.
+      POSTGRES_DB: ${POSTGRES_DB:-inventario}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:?Defina SPRING_DATASOURCE_USERNAME en .env.prod}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Defina SPRING_DATASOURCE_PASSWORD en .env.prod}
+      TZ: America/Lima
+      PGTZ: America/Lima
+    volumes:
+      - datos-bd:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Sin 'ports': la base no es alcanzable desde fuera del servidor.
+
+  # --------------------------------------------------------------------- Backend
+  backend-inventario:
+    build:
+      context: .
+    image: inventario-inictel/backend:1.0
+    <<: *registro
+    restart: unless-stopped
+    env_file:
+      # El mismo archivo que se pasa con --env-file. ARCHIVO_ENTORNO permite
+      # usar otro, p. ej. uno de pruebas, sin tocar el de produccion.
+      - ${ARCHIVO_ENTORNO:-.env.prod}
+    environment:
+      # Estas cuatro mandan sobre lo que diga .env.prod: dentro de Compose la
+      # base es el servicio 'base-datos' y los archivos van al volumen.
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://base-datos:5432/${POSTGRES_DB:-inventario}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      APP_ARCHIVOS_DIRECTORIO: /datos/archivos
+    volumes:
+      # Fotografias (imagenes/) y PDF de baja (archivos/): sobreviven a un
+      # redespliegue (RF-42, RF-51).
+      - archivos:/datos/archivos
+    depends_on:
+      base-datos:
+        condition: service_healthy
+    # Sin 'ports': la API solo se alcanza a traves de nginx.
+
+  # -------------------------------------------------------------------- Frontend
+  frontend:
+    build:
+      context: ../frontend
+    image: inventario-inictel/frontend:1.0
+    <<: *registro
+    restart: unless-stopped
+    ports:
+      - "${PUERTO_HTTP:-80}:8080"
+      - "${PUERTO_HTTPS:-443}:8443"
+    volumes:
+      # El certificado TLS no entra en la imagen: se monta desde el servidor,
+      # en solo lectura.
+      - ${CERTIFICADOS_DIR:-./certificados}:/etc/nginx/ssl:ro
+    depends_on:
+      backend-inventario:
+        condition: service_healthy
+
+volumes:
+  datos-bd:
+  archivos:

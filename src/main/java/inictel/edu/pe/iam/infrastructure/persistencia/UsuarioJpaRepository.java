@@ -47,12 +47,20 @@ public interface UsuarioJpaRepository
     Optional<UsuarioJpaEntity> buscarPorCoordinacionYRol(@Param("coordinacionId") Long coordinacionId,
                                                          @Param("rol") Rol rol);
 
-    /** RF-29: integrantes de una Coordinacion, el responsable primero. */
+    /**
+     * RF-29: integrantes de una Coordinacion, el responsable primero.
+     *
+     * <p>Incluye a quienes trabajaban aqui y se dieron de baja (RN-34): la baja
+     * borra su asignacion, pero su Responsable tiene que poder verlos y
+     * reincorporarlos.</p>
+     */
     @Query("""
-            SELECT u FROM UsuarioJpaEntity u JOIN u.asignaciones a
-            WHERE a.coordinacionId = :coordinacionId
+            SELECT DISTINCT u FROM UsuarioJpaEntity u LEFT JOIN u.asignaciones a
+            WHERE (a.coordinacionId = :coordinacionId
+                   OR (u.estado = inictel.edu.pe.iam.domain.model.EstadoCuenta.BAJA
+                       AND u.ultimaCoordinacionId = :coordinacionId))
               AND (:soloActivos = FALSE OR u.estado = inictel.edu.pe.iam.domain.model.EstadoCuenta.ACTIVA)
-            ORDER BY u.rol ASC, u.primerApellido ASC
+            ORDER BY u.estado ASC, u.rol ASC, u.primerApellido ASC
             """)
     List<UsuarioJpaEntity> listarPorCoordinacion(@Param("coordinacionId") Long coordinacionId,
                                                  @Param("soloActivos") boolean soloActivos);
@@ -65,13 +73,6 @@ public interface UsuarioJpaRepository
               AND u.estado <> inictel.edu.pe.iam.domain.model.EstadoCuenta.BAJA
             """)
     long contarPorCoordinacionYRol(@Param("coordinacionId") Long coordinacionId, @Param("rol") Rol rol);
-
-    @Query("""
-            SELECT COUNT(u) FROM UsuarioJpaEntity u JOIN u.asignaciones a
-            WHERE a.coordinacionId = :coordinacionId
-              AND u.estado <> inictel.edu.pe.iam.domain.model.EstadoCuenta.BAJA
-            """)
-    long contarActivosEnCoordinacion(@Param("coordinacionId") Long coordinacionId);
 
     /**
      * RF-26b: personas que pueden tomar el puesto de Responsable de una

@@ -17,7 +17,8 @@ final class PrestamoMapper {
                 entidad.getId(),
                 new BienPrestado(bien.getId(), entidad.getCoordinacionId(), bien.getNombre(),
                         bien.getCodigoInventario(), bien.getNumeroSerie()),
-                new PersonaResponsable(entidad.getNombrePersona(), entidad.getDniPersona()),
+                new PersonaResponsable(entidad.getNombrePersona(), entidad.getDniPersona(),
+                        entidad.getPersonaUsuarioId(), entidad.getCoordinacionDestinoId()),
                 entidad.getDestino(),
                 entidad.getFechaPrestamo(),
                 entidad.getFechaEstimadaDevolucion(),
@@ -42,6 +43,8 @@ final class PrestamoMapper {
         entidad.setCoordinacionId(prestamo.coordinacionId());
         entidad.setNombrePersona(prestamo.getPersona().nombre());
         entidad.setDniPersona(prestamo.getPersona().dni());
+        entidad.setPersonaUsuarioId(prestamo.getPersona().usuarioId());
+        entidad.setCoordinacionDestinoId(prestamo.getPersona().coordinacionId());
         entidad.setDestino(prestamo.getDestino());
         entidad.setFechaPrestamo(prestamo.getFechaPrestamo());
         entidad.setFechaEstimadaDevolucion(prestamo.getFechaEstimadaDevolucion());

@@ -66,6 +66,7 @@ final class InventarioMapper {
                 entidad.getFotoUrl(),
                 entidad.isRevisionPendiente(),
                 entidad.getMotivoBaja(),
+                entidad.getDocumentoBajaUrl(),
                 entidad.getFechaBaja(),
                 entidad.getResponsableId(),
                 entidad.getResponsableEquipoId(),
@@ -99,6 +100,7 @@ final class InventarioMapper {
         entidad.setFotoUrl(equipo.getFotoUrl());
         entidad.setRevisionPendiente(equipo.isRevisionPendiente());
         entidad.setMotivoBaja(equipo.getMotivoBaja());
+        entidad.setDocumentoBajaUrl(equipo.getDocumentoBajaUrl());
         entidad.setFechaBaja(equipo.getFechaBaja());
         entidad.setResponsableId(equipo.getResponsableId());
         entidad.setResponsableEquipoId(equipo.getResponsableEquipoId());

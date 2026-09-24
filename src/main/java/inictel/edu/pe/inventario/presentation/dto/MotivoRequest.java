@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Motivo de una accion que cambia la condicion de un bien (RF-41 .. RF-43).
+ * Motivo de una accion que cambia la condicion de un bien (RF-41).
  *
  * <p>El motivo es obligatorio porque queda en el historial del bien y es lo que
  * permite responder mas tarde "por que se dio de baja este equipo" (RF-53).</p>

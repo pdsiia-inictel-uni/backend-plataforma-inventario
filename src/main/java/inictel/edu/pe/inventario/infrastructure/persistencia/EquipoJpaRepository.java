@@ -1,6 +1,5 @@
 package inictel.edu.pe.inventario.infrastructure.persistencia;
 
-import inictel.edu.pe.inventario.domain.model.CondicionEquipo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;

@@ -35,16 +35,6 @@ public record FiltroEquipos(
         Long responsableEquipoId,
         boolean sinResponsableEquipo) {
 
-    /** Vista por defecto: solo los bienes operativos de la coordinacion. */
-    public static FiltroEquipos operativosDe(Long coordinacionId) {
-        return new FiltroEquipos(coordinacionId, null, null, null,
-                CondicionEquipo.OPERATIVO, false, null, false);
-    }
-
-    public static FiltroEquipos todosDe(Long coordinacionId) {
-        return new FiltroEquipos(coordinacionId, null, null, null, null, true, null, false);
-    }
-
     /** RF-84: los bienes en servicio a nombre de una persona. */
     public static FiltroEquipos aCargoDe(Long coordinacionId, Long responsableEquipoId) {
         return new FiltroEquipos(coordinacionId, null, null, null, null, true,
@@ -55,10 +45,5 @@ public record FiltroEquipos(
     public FiltroEquipos enCoordinacion(Long coordinacion) {
         return new FiltroEquipos(coordinacion, texto, categoriaId, laboratorioId,
                 condicion, todasLasCondiciones, responsableEquipoId, sinResponsableEquipo);
-    }
-
-    /** true si la vista esta acotada a quien tiene los bienes a su cargo (RF-84). */
-    public boolean filtraPorResponsableDeEquipo() {
-        return responsableEquipoId != null || sinResponsableEquipo;
     }
 }
