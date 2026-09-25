@@ -33,8 +33,8 @@ public class AlmacenDocumentosBajaLocal implements AlmacenDocumentosBaja {
     /** Subcarpeta de los documentos de baja, y segmento de su URL publica. */
     public static final String CARPETA = "archivos";
 
-    /** 10 MB: un acta escaneada pesa mas que una foto. */
-    public static final long TAMANO_MAXIMO = 10L * 1024 * 1024;
+    /** 5 MB, el mismo limite que las fotografias (RF-42, RF-51e). */
+    public static final long TAMANO_MAXIMO = 5L * 1024 * 1024;
 
     private static final Logger log = LoggerFactory.getLogger(AlmacenDocumentosBajaLocal.class);
     private static final List<String> TIPOS_PERMITIDOS = List.of("application/pdf", "application/x-pdf");
@@ -61,7 +61,7 @@ public class AlmacenDocumentosBajaLocal implements AlmacenDocumentosBaja {
             throw new DatosInvalidosException("archivo", "Adjunte el documento de baja en PDF.");
         }
         if (tamano > TAMANO_MAXIMO) {
-            throw new DatosInvalidosException("archivo", "El PDF no puede superar los 10 MB.");
+            throw new DatosInvalidosException("archivo", "El PDF no puede superar los 5 MB.");
         }
         boolean tipoValido = tipoContenido != null
                 && TIPOS_PERMITIDOS.contains(tipoContenido.toLowerCase(Locale.ROOT));

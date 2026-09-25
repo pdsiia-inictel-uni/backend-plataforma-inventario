@@ -145,7 +145,7 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<RespuestaError> archivoGrande(MaxUploadSizeExceededException ex, HttpServletRequest req) {
         return construir(HttpStatus.PAYLOAD_TOO_LARGE, "ARCHIVO_MUY_GRANDE",
-                "El archivo supera el tamaño máximo permitido (10 MB).", req, null);
+                "El archivo supera el tamaño máximo permitido (5 MB).", req, null);
     }
 
     /** Un endpoint que espera un archivo recibio otro tipo de cuerpo (p. ej. JSON). */
